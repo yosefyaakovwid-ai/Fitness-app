@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>FatLoss Coach</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:#0f172a;color:#e2e8f0}
+header{padding:16px;text-align:center;font-size:20px;font-weight:700;background:#1e293b}
+main{padding:14px;max-width:520px;margin:auto;padding-bottom:80px}
+.card{background:#1e293b;border-radius:14px;padding:16px;margin-bottom:14px}
+h3{margin:0 0 6px}label{display:block;margin:10px 0 4px;font-size:14px;color:#94a3b8}
+input,select,button,textarea{width:100%;padding:12px;font-size:16px;border-radius:10px;border:1px solid #334155;background:#0f172a;color:#e2e8f0}
+textarea{min-height:170px;font-family:inherit}
+input[type=checkbox]{width:auto;margin-right:8px}.chk{display:flex;align-items:center;color:#e2e8f0}
+button{background:#22c55e;color:#04210f;font-weight:700;border:none;margin-top:14px}
+button.sec{background:#334155;color:#e2e8f0}
+.big{font-size:28px;font-weight:800;color:#22c55e}.row{display:flex;gap:10px}.row>div,.row>button{flex:1}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#1e293b}
+nav button{margin:0;border-radius:0;background:none;color:#94a3b8;font-size:14px}nav button.on{color:#22c55e}
+.hide{display:none}li{margin:6px 0}small{color:#94a3b8}
+.tag{display:inline-block;padding:2px 8px;border-radius:8px;font-size:12px;margin-left:6px}
+.meat{background:#7f1d1d}.dairy{background:#1e3a8a}.pareve{background:#14532d}
+table{width:100%;border-collapse:collapse}td{padding:6px 0;border-bottom:1px solid #334155}
+.bar{height:10px;background:#334155;border-radius:6px;overflow:hidden;margin-top:8px}.bar>div{height:100%;background:#22c55e}
+.over>div{background:#f97316}
+</style>
+</head>
+<body>
+<header>FatLoss Coach</header>
+<main>
+<section id="profile">
+ <div class="card"><h3>About you</h3>
+  <label>Sex</label><select id="sex"><option value="m">Male</option><option value="f">Female</option></select>
+  <div class="row"><div><label>Age</label><input id="age" type="number" inputmode="numeric"></div>
+  <div><label>Height (cm)</label><input id="height" type="number" inputmode="decimal"></div></div>
+  <label>Current weight (kg)</label><input id="weight" type="number" inputmode="decimal">
+  <label>Daily activity (outside workouts)</label>
+  <select id="act"><option value="1.2">Mostly sitting</option><option value="1.375">Lightly active</option><option value="1.55">On my feet a lot</option><option value="1.725">Very active job</option></select>
+ </div>
+ <div class="card"><h3>Training</h3>
+  <label>Split</label>
+  <select id="split"><option value="full">Full body (A/B/C)</option><option value="ul">Upper / Lower</option><option value="ppl">Push / Pull / Legs</option></select>
+  <label>Workout style</label>
+  <select id="style"><option value="straight">Straight sets</option><option value="superset">Supersets (pairs)</option><option value="circuit">Circuit</option></select>
+  <label>Days per week</label><select id="days"><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option></select>
+ </div>
+ <div class="card"><h3>Diet</h3>
+  <label class="chk"><input type="checkbox" id="kosher">Keep kosher</label>
+  <label class="chk"><input type="checkbox" id="shabbat">Eat more on Friday and Saturday</label>
+  <label>Extra calories on each of those days</label>
+  <select id="extra"><option>200</option><option selected>400</option><option>600</option><option>800</option></select>
+  <label>Foods to avoid (comma separated)</label><input id="avoid" placeholder="e.g. fish, nuts">
+ </div>
+ <button onclick="saveProfile()">Save & build my plan</button>
+</section>
+<section id="plan" class="hide"></section>
+<section id="train" class="hide"></section>
+<section id="log" class="hide">
+ <div class="card">
+  <label>Today's weight (kg)</label><input id="newW" type="number" inputmode="decimal">
+  <button onclick="logWeight()">Log weight</button>
+  <p><small>Weigh in each morning if you can. The app uses weekly averages, so the ups and downs around Shabbat even out.</small></p>
+ </div>
+ <div class="card" id="history"></div>
+</section>
+</main>
+<nav>
+ <button id="t-plan" onclick="tab('plan')">Diet</button>
+ <button id="t-train" onclick="tab('train')">Training</button>
+ <button id="t-log" onclick="tab('log')">Progress</button>
+ <button id="t-profile" onclick="tab('profile')">Settings</button>
+</nav>
+<script>
+const S=JSON.parse(localStorage.getItem('flc')||'{}');
+S.profile=S.profile||null;S.logs=S.logs||[];S.adj=S.adj||0;S.food=S.food||{};S.custom=S.custom||{};
+const save=()=>localStorage.setItem('flc',JSON.stringify(S));
+const $=id=>document.getElementById(id);
+const FIELDS=['sex','age','height','weight','act','split','style','days','extra','avoid'],CHECKS=['kosher','shabbat'];
+function ymd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+const today=()=>ymd(new Date());
+const daysAgo=s=>(new Date(today())-new Date(s))/864e5;
+function tab(t){['profile','plan','train','log'].forEach(x=>{$(x).classList.toggle('hide',x!==t);$('t-'+x).classList.toggle('on',x===t)});
+ if(t==='plan')renderDiet();if(t==='train')renderTrain();if(t==='log')renderLog()}
+function saveProfile(){const p={};FIELDS.forEach(f=>p[f]=$(f).value);CHECKS.forEach(c=>p[c]=$(c).checked);
+ ['age','height','weight','act','days','extra'].forEach(k=>p[k]=+p[k]);
+ if(!p.age||!p.height||!p.weight)return alert('Please fill in age, height and weight.');
+ S.profile=p;if(!S.logs.length)S.logs.push({d:today(),w:p.weight});save();tab('plan')}
+const curW=()=>S.logs.length?S.logs[S.logs.length-1].w:S.profile.weight;
+
+/* ---------- Calorie targets ---------- */
+function targets(){const p=S.profile,w=curW();
+ const bmr=10*w+6.25*p.height-5*p.age+(p.sex==='m'?5:-161),tdee=bmr*p.act;
+ const floor=p.sex==='m'?1500:1200;
+ const avgK=Math.max(floor,tdee-Math.min(500,tdee*0.2)+S.adj);
+ let week=avgK*7,extra=p.shabbat?p.extra:0,weekday=(week-2*extra)/7;
+ if(weekday<floor){weekday=floor;extra=Math.max(0,(week-7*floor)/2)}
+ const r=x=>Math.round(x/10)*10;
+ return{tdee:r(tdee),avg:r(avgK),weekday:r(weekday),weekend:r(weekday+extra),extra:r(extra),protein:Math.round(w*1.8)}}
+function targetFor(dateStr){const t=targets(),dow=new Date(dateStr+'T12:00').getDay();
+ return(S.profile.shabbat&&t.extra>0&&(dow===5||dow===6))?t.weekend:(S.profile.shabbat&&t.extra>0?t.weekday:t.avg)}
+
+/* ---------- Food log ---------- */
+function addFood(){const k=+$('kc').value,pr=+$('pr').value||0;if(!k)return;const d=today();
+ const f=S.food[d]||{k:0,p:0};f.k+=k;f.p+=pr;S.food[d]=f;save();renderDiet()}
+function setFood(){const k=+$('kc').value,pr=+$('pr').value||0;if(!k&&!pr)return;S.food[today()]={k,p:pr};save();renderDiet()}
+function clearFood(){delete S.food[today()];save();renderDiet()}
+
+/* ---------- Meal ideas ---------- */
+const MEALS=[
+ {n:'Greek yoghurt, berries and oats',t:'dairy',f:'yoghurt,oats'},
+ {n:'Shakshuka with cottage cheese and salad',t:'dairy',f:'eggs,cheese'},
+ {n:'Omelette with veg and feta',t:'dairy',f:'eggs,cheese'},
+ {n:'Grilled chicken breast, rice and salad',t:'meat',f:'chicken,rice'},
+ {n:'Turkey mince stir-fry with vegetables',t:'meat',f:'turkey'},
+ {n:'Lean beef and bean chilli',t:'meat',f:'beef,beans'},
+ {n:'Baked salmon, potatoes and greens',t:'pareve',f:'fish,salmon'},
+ {n:'Tuna salad wrap',t:'pareve',f:'fish,tuna,wheat'},
+ {n:'Lentil soup with wholegrain bread',t:'pareve',f:'lentils,wheat'},
+ {n:'Tofu and chickpea bowl with tahini',t:'pareve',f:'tofu,chickpeas,sesame'},
+ {n:'Shabbat: roast chicken, roasted veg, small portion of kugel',t:'meat',f:'chicken,potato'},
+ {n:'Shabbat: lighter cholent with lean beef and extra beans',t:'meat',f:'beef,beans,barley'}];
+const NONKOSHER=/pork|bacon|ham|shrimp|prawn|lobster|crab|shellfish/i;
+function meals(){const p=S.profile,av=(p.avoid||'').toLowerCase().split(',').map(s=>s.trim()).filter(Boolean);
+ return MEALS.filter(m=>!(p.kosher&&NONKOSHER.test(m.n))&&!av.some(a=>(m.n+','+m.f).toLowerCase().includes(a)))}
+
+function renderDiet(){if(!S.profile){$('plan').innerHTML='<div class="card">Fill in Settings first.</div>';return}
+ const p=S.profile,t=targets(),d=today(),tgt=targetFor(d),f=S.food[d]||{k:0,p:0};
+ const pct=Math.min(100,f.k/tgt*100),left=tgt-f.k;
+ let h=`<div class="card"><h3>Today</h3>
+  <div class="row"><div><small>Eaten</small><div class="big">${f.k}</div></div>
+  <div><small>Target</small><div class="big" style="color:#e2e8f0">${tgt}</div></div></div>
+  <div class="bar ${left<0?'over':''}"><div style="width:${pct}%"></div></div>
+  <p>${left>=0?`<b>${left}</b> kcal left`:`<b>${-left}</b> kcal over`} &middot; Protein <b>${f.p}</b> / ${t.protein} g</p>
+  <div class="row"><div><label>Calories</label><input id="kc" type="number" inputmode="numeric"></div>
+  <div><label>Protein (g)</label><input id="pr" type="number" inputmode="numeric"></div></div>
+  <div class="row"><button onclick="addFood()">Add meal</button><button class="sec" onclick="setFood()">Set day total</button></div>
+  <button class="sec" onclick="clearFood()">Clear today</button>
+  <p><small>Scan meals in your photo app, then add each one here, or just enter the day's total from it.</small></p></div>`;
+ let wk=0,wkT=0,rows='';
+ for(let i=6;i>=0;i--){const dd=new Date();dd.setDate(dd.getDate()-i);const s=ymd(dd),e=S.food[s],tg=targetFor(s);
+  wkT+=tg;if(e)wk+=e.k;rows+=`<tr><td>${dd.toLocaleDateString('en-GB',{weekday:'short',day:'numeric'})}</td><td>${e?e.k:'-'}</td><td><small>${tg}</small></td></tr>`}
+ h+=`<div class="card"><h3>Last 7 days</h3><table><tr><td><small>Day</small></td><td><small>Eaten</small></td><td><small>Target</small></td></tr>${rows}</table>
+  <p>Logged total: <b>${wk}</b> of ${wkT} kcal</p></div>`;
+ h+=`<div class="card"><h3>Your targets</h3>`;
+ if(p.shabbat&&t.extra>0)h+=`<p>Sunday to Thursday: <b>${t.weekday}</b><br>Friday and Saturday: <b>${t.weekend}</b></p><small>The weekly total stays the same (an average of ${t.avg} a day).</small>`;
+ else h+=`<p>Every day: <b>${t.avg}</b> kcal</p>`;
+ h+=`<p><small>Maintenance is about ${t.tdee} kcal${S.adj?`. Adjusted ${S.adj>0?'+':''}${S.adj} kcal based on your progress`:''}.</small></p>
+  <p>Protein: <b>${t.protein} g</b> &middot; Steps: <b>8,000+</b> &middot; Sleep: <b>7 to 9 h</b></p></div>`;
+ h+='<div class="card"><h3>Meal ideas</h3>';
+ if(p.kosher)h+='<small>Each one is tagged meat, dairy or pareve. Follow your own custom for waiting between meat and dairy.</small>';
+ h+='<ul>'+meals().map(m=>`<li>${m.n}${p.kosher?`<span class="tag ${m.t}">${m.t}</span>`:''}</li>`).join('')+'</ul></div>';
+ $('plan').innerHTML=h}
+
+/* ---------- Training + editor ---------- */
+const LIB={
+ full:{A:['Squat','Bench press','Barbell row','Romanian deadlift','Lateral raise','Plank'],
+       B:['Deadlift','Overhead press','Lat pulldown','Split squat','Cable fly','Hanging knee raise'],
+       C:['Leg press','Incline DB press','Seated cable row','Hip thrust','Face pull','Ab wheel']},
+ ul:{Upper:['Bench press','Barbell row','Overhead press','Lat pulldown','Biceps curl','Triceps pushdown'],
+     Lower:['Squat','Romanian deadlift','Leg press','Leg curl','Calf raise','Plank']},
+ ppl:{Push:['Bench press','Overhead press','Incline DB press','Lateral raise','Triceps pushdown','Cable fly'],
+      Pull:['Deadlift','Pull-ups or Lat pulldown','Seated cable row','Face pull','Biceps curl','Hammer curl'],
+      Legs:['Squat','Romanian deadlift','Leg press','Leg curl','Calf raise','Hanging knee raise']}};
+let editing=null;
+function exFor(k){const sp=S.profile.split;return(S.custom[sp]&&S.custom[sp][k])||LIB[sp][k]}
+function editW(k){editing=k;renderTrain()}
+function saveW(k){const sp=S.profile.split,list=$('ed').value.split('\n').map(s=>s.trim()).filter(Boolean);
+ if(!list.length)return alert('Add at least one exercise.');S.custom[sp]=S.custom[sp]||{};S.custom[sp][k]=list;editing=null;save();renderTrain()}
+function resetW(k){const sp=S.profile.split;if(S.custom[sp])delete S.custom[sp][k];editing=null;save();renderTrain()}
+function renderTrain(){if(!S.profile){$('train').innerHTML='<div class="card">Fill in Settings first.</div>';return}
+ const p=S.profile,keys=Object.keys(LIB[p.split]);
+ const note={straight:'3 sets of 6 to 12 reps. Rest 1.5 to 2 minutes.',
+  superset:'Exercises are paired in the order listed (A1 then A2). Do them back to back, rest 60 to 90 seconds, and repeat 3 times.',
+  circuit:'Do every exercise once for 10 to 12 reps with little rest, then rest 2 minutes. 3 to 4 rounds.'}[p.style];
+ let h=`<div class="card"><h3>How to train</h3><small>${note} When every set feels solid, add weight or a rep. Tap Edit to change any workout. You can add notes like "Squat 4x6".</small></div>`;
+ const shown=[];for(let i=0;i<p.days;i++)shown.push(keys[i%keys.length]);
+ shown.forEach((k,i)=>{const ex=exFor(k);h+=`<div class="card"><h3>Day ${i+1}: ${k}</h3>`;
+  if(editing===k&&shown.indexOf(k)===i){h+=`<small>One exercise per line. Order matters for supersets.</small>
+   <textarea id="ed">${ex.join('\n')}</textarea>
+   <div class="row"><button onclick="saveW('${k}')">Save</button><button class="sec" onclick="resetW('${k}')">Reset</button></div>
+   <button class="sec" onclick="editing=null;renderTrain()">Cancel</button>`}
+  else{if(p.style==='superset'){h+='<ul>';for(let j=0;j<ex.length;j+=2){const L=String.fromCharCode(65+j/2);
+    h+=`<li><b>${L}1</b> ${ex[j]}${ex[j+1]?`<br><b>${L}2</b> ${ex[j+1]}`:''}</li>`}h+='</ul>'}
+   else h+=(p.style==='circuit'?'<ol>':'<ul>')+ex.map(e=>`<li>${e}</li>`).join('')+(p.style==='circuit'?'</ol>':'</ul>');
+   h+=`<button class="sec" onclick="editW('${k}')">Edit</button>`}
+  h+='</div>'});
+ $('train').innerHTML=h}
+
+/* ---------- Progress and auto-adjust ---------- */
+function logWeight(){const w=+$('newW').value;if(!w)return;const d=today();S.logs=S.logs.filter(l=>l.d!==d);
+ S.logs.push({d,w});S.logs.sort((a,b)=>a.d<b.d?-1:1);adjust();save();$('newW').value='';renderLog()}
+function avg(a,b){const xs=S.logs.filter(l=>{const g=daysAgo(l.d);return g>=a&&g<b}).map(l=>l.w);
+ return xs.length?xs.reduce((x,y)=>x+y)/xs.length:null}
+function adjust(){const last=avg(0,7),prev=avg(7,14);if(!last||!prev)return;
+ if(S.lastAdj&&daysAgo(S.lastAdj)<7)return;
+ const rate=(prev-last)/prev*100;if(rate<0.25)S.adj-=150;else if(rate>1)S.adj+=150;else return;
+ S.adj=Math.max(-600,Math.min(300,S.adj));S.lastAdj=today()}
+function renderLog(){const last=avg(0,7),prev=avg(7,14);let h='<h3>Progress</h3>';
+ if(last)h+=`<p>This week's average: <b>${last.toFixed(1)} kg</b></p>`;
+ if(last&&prev){const r=(prev-last)/prev*100;h+=`<p>Change from last week: <b>${(last-prev).toFixed(1)} kg</b><br><small>${r.toFixed(2)}% a week. The target is 0.25 to 1%.</small></p>`}
+ h+='<ul>'+S.logs.slice(-14).reverse().map(l=>`<li>${l.d}: ${l.w} kg</li>`).join('')+'</ul>';$('history').innerHTML=h}
+
+/* ---------- Start ---------- */
+if(S.profile){FIELDS.forEach(f=>{if(S.profile[f]!==undefined)$(f).value=S.profile[f]});CHECKS.forEach(c=>$(c).checked=!!S.profile[c]);tab('plan')}
+else tab('profile');
+</script>
+</body>
+</html>

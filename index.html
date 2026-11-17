@@ -24,10 +24,12 @@ nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#1e293b}
 nav button{margin:0;border-radius:0;background:none;color:#94a3b8;font-size:14px}nav button.on{color:#22c55e}
 .hide{display:none}li{margin:6px 0}small{color:#94a3b8}details{margin-top:6px}summary{color:#94a3b8;font-size:14px}
 .tag{display:inline-block;padding:2px 8px;border-radius:8px;font-size:12px;margin-left:6px}
-.meat{background:#7f1d1d}.dairy{background:#1e3a8a}.pareve{background:#14532d}.occ{background:#78350f}.heart{background:#065f46}.pref{background:#4c1d95}
+.meat{background:#7f1d1d}.dairy{background:#1e3a8a}.pareve{background:#14532d}.occ{background:#78350f}.heart{background:#065f46}.pref{background:#4c1d95}.mine{background:#a16207}
 table{width:100%;border-collapse:collapse}td{padding:6px 0;border-bottom:1px solid #334155}
 .bar{height:10px;background:#334155;border-radius:6px;overflow:hidden;margin-top:8px}.bar>div{height:100%;background:#22c55e}
 .over>div{background:#f97316}.wbar>div{background:#38bdf8}
+.banner{background:#38bdf8;color:#04202e;border-radius:14px;padding:14px;margin-bottom:14px;font-weight:600}
+.mylist li{display:flex;justify-content:space-between;align-items:center;gap:8px}
 </style>
 </head>
 <body>
@@ -38,7 +40,8 @@ table{width:100%;border-collapse:collapse}td{padding:6px 0;border-bottom:1px sol
   <label>Sex</label><select id="sex"><option value="m">Male</option><option value="f">Female</option></select>
   <div class="row"><div><label>Age</label><input id="age" type="number" inputmode="numeric"></div>
   <div><label>Height (cm)</label><input id="height" type="number" inputmode="decimal"></div></div>
-  <label>Current weight (kg)</label><input id="weight" type="number" inputmode="decimal">
+  <div class="row"><div><label>Current weight (kg)</label><input id="weight" type="number" inputmode="decimal"></div>
+  <div><label>Goal weight (kg)</label><input id="goal" type="number" inputmode="decimal"></div></div>
   <label>Overall activity, including your workouts</label>
   <select id="act">
    <option value="1.2">Sedentary: desk job, little or no exercise</option>
@@ -46,6 +49,9 @@ table{width:100%;border-collapse:collapse}td{padding:6px 0;border-bottom:1px sol
    <option value="1.55">Moderate: exercise 3 to 5 days a week</option>
    <option value="1.725">Very active: hard exercise 6 to 7 days, or a physical job</option>
   </select>
+  <label>Weigh-in day</label>
+  <select id="wday"><option value="daily">Every day (most accurate)</option><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="0">Sunday</option><option value="6">Saturday</option></select>
+  <small>Weigh first thing in the morning, after the toilet, before food or drink. Avoid Sunday if you can, as you often hold extra water after Shabbat.</small>
  </div>
  <div class="card"><h3>Training</h3>
   <label>Split</label>
@@ -55,6 +61,9 @@ table{width:100%;border-collapse:collapse}td{padding:6px 0;border-bottom:1px sol
   <label>Days per week</label><select id="days"><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option></select>
  </div>
  <div class="card"><h3>Diet</h3>
+  <label>Region</label>
+  <select id="region"><option value="il">Israel</option><option value="us">USA and Canada</option><option value="uk">UK</option><option value="eu">Europe</option><option value="all">Show everything</option></select>
+  <small>Meal ideas use foods that are easy to find where you live.</small>
   <label class="chk"><input type="checkbox" id="kosher">Keep kosher</label>
   <label class="chk"><input type="checkbox" id="shabbat">Eat more on Friday and Saturday</label>
   <label>Extra calories on each of those days</label>
@@ -63,6 +72,15 @@ table{width:100%;border-collapse:collapse}td{padding:6px 0;border-bottom:1px sol
   <select id="rotate"><option value="1">Day</option><option value="2" selected>2 days</option><option value="3">3 days</option><option value="7">Week</option></select>
   <label>Foods I don't like or avoid (comma separated)</label><input id="avoid" placeholder="e.g. salmon, cucumber, tofu">
   <small>Any meal containing these is hidden.</small>
+ </div>
+ <div class="card"><h3>My meals</h3>
+  <small>Add your own meals. They're included in the menu whatever region you pick, and changes save straight away.</small>
+  <label>Meal</label><input id="myName" placeholder="e.g. Salmon poke bowl">
+  <div class="row"><div><label>When</label><select id="mySlot"><option value="b">Breakfast</option><option value="l">Lunch</option><option value="d">Supper</option><option value="x">Snack</option></select></div>
+  <div><label>Type</label><select id="myType"><option value="meat">Meat</option><option value="dairy">Dairy</option><option value="pareve">Pareve</option></select></div></div>
+  <label>Main ingredients (optional, comma separated)</label><input id="myIng" placeholder="e.g. salmon, rice, avocado">
+  <button class="sec" onclick="addMyMeal()">Add meal</button>
+  <ul class="mylist" id="myList"></ul>
  </div>
  <div class="card"><h3>Food preferences</h3>
   <small>Matching meals come up more often, and you get tips for each one you tick.</small>
@@ -77,11 +95,11 @@ table{width:100%;border-collapse:collapse}td{padding:6px 0;border-bottom:1px sol
  <div class="card"><h3>Water</h3>
   <label>Your bottle size (ml)</label><input id="bottle" type="number" inputmode="numeric" placeholder="750">
   <label>Daily water goal (ml)</label><input id="waterGoal" type="number" inputmode="numeric" placeholder="Leave empty for automatic">
-  <small>Automatic is about 35 ml per kg of body weight. Drink more on training days and hot days.</small>
+  <small>Automatic is about 35 ml per kg of body weight.</small>
  </div>
  <button onclick="saveProfile()">Save & build my plan</button>
  <div class="card" style="margin-top:14px"><h3>Your data</h3>
-  <small>Spreadsheet: weigh-ins, calories and water, for Excel, Google Sheets or other apps.<br>Backup: everything, which you can import back here.</small>
+  <small>Spreadsheet: weigh-ins, calories and water.<br>Backup: everything, which you can import back here.</small>
   <button class="sec" onclick="exportCSV()">Export spreadsheet (CSV)</button>
   <button class="sec" onclick="exportBackup()">Export full backup</button>
   <button class="sec" onclick="$('imp').click()">Import backup</button>
@@ -91,10 +109,11 @@ table{width:100%;border-collapse:collapse}td{padding:6px 0;border-bottom:1px sol
 <section id="plan" class="hide"></section>
 <section id="train" class="hide"></section>
 <section id="log" class="hide">
+ <div id="goalCard"></div>
  <div class="card">
   <label>Today's weight (kg)</label><input id="newW" type="number" inputmode="decimal">
   <button onclick="logWeight()">Log weight</button>
-  <p><small>Weigh in each morning if you can. The app uses weekly averages, so the ups and downs around Shabbat even out.</small></p>
+  <p><small id="wtip"></small></p>
  </div>
  <div class="card" id="history"></div>
 </section>
@@ -105,271 +124,7 @@ table{width:100%;border-collapse:collapse}td{padding:6px 0;border-bottom:1px sol
  <button id="t-log" onclick="tab('log')">Progress</button>
  <button id="t-profile" onclick="tab('profile')">Settings</button>
 </nav>
-<script>
-const S=JSON.parse(localStorage.getItem('flc')||'{}');
-S.profile=S.profile||null;S.logs=S.logs||[];S.adj=S.adj||0;S.food=S.food||{};S.custom=S.custom||{};S.water=S.water||{};S.shuf=S.shuf||{};
-const save=()=>localStorage.setItem('flc',JSON.stringify(S));
-const $=id=>document.getElementById(id);
-const FIELDS=['sex','age','height','weight','act','split','style','days','extra','rotate','avoid','bottle','waterGoal'],CHECKS=['kosher','shabbat','chol'];
-const NUMS=['age','height','weight','act','days','extra','rotate','bottle','waterGoal'];
-const ALLERGENS={nuts:['Tree nuts',['nuts','almonds','walnuts']],peanuts:['Peanuts',['peanuts']],gluten:['Gluten',['wheat','barley','gluten']],
- dairy:['Dairy',['milk','yoghurt','cheese','whey']],eggs:['Eggs',['eggs']],fish:['Fish',['fish']],soy:['Soy',['soy','tofu']],sesame:['Sesame',['sesame']]};
-const PREFS={veg:['More vegetables','v','veg'],fill:['Bigger, more filling portions','fill','filling'],
- protein:['Extra protein','pr','protein'],fish:['More fish','fish','fish'],quick:['Quick to make','q','quick']};
-$('allergyBox').innerHTML=Object.entries(ALLERGENS).map(([k,[n]])=>`<label class="chk"><input type="checkbox" id="al-${k}">${n}</label>`).join('');
-$('prefBox').innerHTML=Object.entries(PREFS).map(([k,[n]])=>`<label class="chk"><input type="checkbox" id="pf-${k}">${n}</label>`).join('');
-function ymd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
-const today=()=>ymd(new Date());
-const daysAgo=s=>(new Date(today())-new Date(s))/864e5;
-function tab(t){['profile','plan','train','log'].forEach(x=>{$(x).classList.toggle('hide',x!==t);$('t-'+x).classList.toggle('on',x===t)});
- if(t==='plan')renderDiet();if(t==='train')renderTrain();if(t==='log')renderLog()}
-function saveProfile(){const p={};FIELDS.forEach(f=>p[f]=$(f).value);CHECKS.forEach(c=>p[c]=$(c).checked);
- NUMS.forEach(k=>p[k]=+p[k]||0);
- p.allergy=Object.keys(ALLERGENS).filter(a=>$('al-'+a).checked);
- p.prefs=Object.keys(PREFS).filter(a=>$('pf-'+a).checked);
- if(!p.age||!p.height||!p.weight)return alert('Please fill in age, height and weight.');
- S.profile=p;if(!S.logs.length)S.logs.push({d:today(),w:p.weight});save();tab('plan')}
-const curW=()=>S.logs.length?S.logs[S.logs.length-1].w:S.profile.weight;
-
-/* ---------- Export / import ---------- */
-function shareFile(name,text,type){const file=new File([text],name,{type});
- if(navigator.canShare&&navigator.canShare({files:[file]})){navigator.share({files:[file]}).catch(()=>{});return}
- const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=name;document.body.appendChild(a);a.click();a.remove()}
-function exportCSV(){const dates=new Set([...S.logs.map(l=>l.d),...Object.keys(S.food),...Object.keys(S.water)]);
- if(!dates.size)return alert('Nothing logged yet.');
- const rows=[['date','weight_kg','calories','protein_g','target_kcal','water_ml']];
- [...dates].sort().forEach(d=>{const w=S.logs.find(l=>l.d===d),f=S.food[d];
-  rows.push([d,w?w.w:'',f?f.k:'',f?f.p:'',S.profile?targetFor(d):'',S.water[d]||''])});
- shareFile('coach-'+today()+'.csv',rows.map(r=>r.join(',')).join('\n'),'text/csv')}
-function exportBackup(){shareFile('coach-backup-'+today()+'.json',JSON.stringify(S,null,1),'application/json')}
-function importBackup(inp){const file=inp.files[0];if(!file)return;const rd=new FileReader();
- rd.onload=()=>{try{const d=JSON.parse(rd.result);if(!d||typeof d!=='object'||!('logs' in d))throw 0;
-   if(!confirm('This replaces everything currently in the app with the backup. Continue?'))return;
-   localStorage.setItem('flc',JSON.stringify(d));location.reload()}
-  catch(e){alert('That file is not a Coach backup.')}finally{inp.value=''}};
- rd.readAsText(file)}
-
-/* ---------- Calorie targets ---------- */
-function targets(){const p=S.profile,w=curW();
- const bmr=10*w+6.25*p.height-5*p.age+(p.sex==='m'?5:-161),tdee=bmr*p.act;
- const floor=p.sex==='m'?1500:1200;
- const avgK=Math.max(floor,tdee-Math.min(500,tdee*0.2)+S.adj);
- let week=avgK*7,extra=p.shabbat?p.extra:0,weekday=(week-2*extra)/7;
- if(weekday<floor){weekday=floor;extra=Math.max(0,(week-7*floor)/2)}
- const r=x=>Math.round(x/10)*10,pf=(p.prefs||[]).includes('protein')?2.0:1.8;
- return{tdee:r(tdee),avg:r(avgK),weekday:r(weekday),weekend:r(weekday+extra),extra:r(extra),protein:Math.round(w*pf)}}
-function targetFor(ds){const t=targets(),dow=new Date(ds+'T12:00').getDay(),on=S.profile.shabbat&&t.extra>0;
- return on?((dow===5||dow===6)?t.weekend:t.weekday):t.avg}
-
-/* ---------- Food and water log ---------- */
-function addFood(){const k=+$('kc').value,pr=+$('pr').value||0;if(!k)return;const d=today();
- const f=S.food[d]||{k:0,p:0};f.k+=k;f.p+=pr;S.food[d]=f;save();renderDiet()}
-function setFood(){const k=+$('kc').value,pr=+$('pr').value||0;if(!k&&!pr)return;S.food[today()]={k,p:pr};save();renderDiet()}
-function clearFood(){delete S.food[today()];save();renderDiet()}
-const bottleSize=()=>(S.profile&&S.profile.bottle)||750;
-function waterGoal(){const g=S.profile.waterGoal;return g>0?g:Math.round(curW()*35/100)*100}
-function addWater(ml){const d=today();S.water[d]=Math.max(0,(S.water[d]||0)+ml);save();renderDiet()}
-
-/* ---------- Meal library ----------
- s slot (b breakfast, l lunch, d supper, x snack), t kosher type, f ingredients,
- g qualities (v veg-rich, fill filling, pr protein, q quick), h heart-friendly, c richer, sh Shabbat only */
-const MEALS=[
- {s:'b',n:'Greek yoghurt (0-2% fat), berries and oats',t:'dairy',f:'yoghurt,milk,oats,berries',g:'pr,q',h:1},
- {s:'b',n:'Porridge with ground flaxseed, cinnamon and apple',t:'pareve',f:'oats,flaxseed,apple',g:'fill,q',h:1},
- {s:'b',n:'Omelette with veg and feta, wholegrain toast',t:'dairy',f:'eggs,cheese,feta,peppers,spinach,wheat,bread',g:'v,pr,q',c:1},
- {s:'b',n:'Cottage cheese on rice cakes with tomato',t:'dairy',f:'cheese,cottage cheese,milk,rice,tomato',g:'pr,q'},
- {s:'b',n:'Overnight oats with whey protein and banana',t:'dairy',f:'oats,whey,milk,banana',g:'pr,q,fill'},
- {s:'b',n:'Smoked salmon on wholegrain toast with cucumber',t:'pareve',f:'fish,salmon,wheat,bread,cucumber',g:'pr,q',h:1},
- {s:'b',n:'Israeli breakfast: 2 eggs, chopped salad, labneh, wholegrain pitta',t:'dairy',f:'eggs,cucumber,tomato,labneh,yoghurt,milk,wheat,bread',g:'v,pr,fill'},
- {s:'b',n:'Egg-white scramble with spinach and mushrooms on toast',t:'pareve',f:'eggs,spinach,mushrooms,wheat,bread',g:'v,pr,q',h:1},
- {s:'b',n:'Skyr with pear and walnuts',t:'dairy',f:'yoghurt,skyr,milk,pear,nuts,walnuts',g:'pr,q',h:1},
- {s:'b',n:'Wholegrain toast with avocado and a boiled egg',t:'pareve',f:'wheat,bread,avocado,eggs',g:'q,fill',h:1},
- {s:'b',n:'Protein pancakes (oats, egg, banana) with yoghurt',t:'dairy',f:'oats,eggs,banana,yoghurt,milk',g:'pr,fill'},
- {s:'l',n:'Grilled chicken breast, brown rice and salad',t:'meat',f:'chicken,rice,lettuce,cucumber,tomato',g:'pr,v,fill',h:1},
- {s:'l',n:'Big chopped salad with eggs and hummus',t:'pareve',f:'eggs,cucumber,tomato,peppers,chickpeas,sesame,tahini',g:'v,fill,q',h:1},
- {s:'l',n:'Tuna salad wrap',t:'pareve',f:'fish,tuna,wheat,bread,lettuce,mayonnaise,eggs',g:'pr,q'},
- {s:'l',n:'Lentil soup with wholegrain bread',t:'pareve',f:'lentils,carrot,onion,celery,wheat,bread',g:'v,fill',h:1},
- {s:'l',n:'Tofu and chickpea bowl with tahini',t:'pareve',f:'tofu,soy,chickpeas,sesame,tahini,quinoa,cucumber',g:'v,fill',h:1},
- {s:'l',n:'Chicken shawarma bowl with salad, tahini and a small pitta',t:'meat',f:'chicken,cucumber,tomato,onion,sesame,tahini,wheat,bread',g:'pr,v,fill'},
- {s:'l',n:'Quinoa salad with chickpeas, herbs and lemon',t:'pareve',f:'quinoa,chickpeas,parsley,cucumber,tomato,lemon',g:'v,q',h:1},
- {s:'l',n:'Sardines on wholegrain toast with tomato salad',t:'pareve',f:'fish,sardines,wheat,bread,tomato,onion',g:'pr,q',h:1},
- {s:'l',n:'Turkey breast and salad sandwich on wholegrain bread',t:'meat',f:'turkey,wheat,bread,lettuce,tomato,cucumber,mustard',g:'pr,q'},
- {s:'l',n:'Majadra (lentils and rice) with a big salad',t:'pareve',f:'lentils,rice,onion,cucumber,tomato',g:'fill,v',h:1},
- {s:'l',n:'Shabbat: lighter cholent with lean beef and extra beans',t:'meat',f:'beef,beans,barley,potato,onion',g:'fill',c:1,sh:1},
- {s:'l',n:'Shabbat: cold chicken, salads and a slice of challah',t:'meat',f:'chicken,cucumber,tomato,carrot,wheat,bread,eggs',g:'pr,v,q',sh:1},
- {s:'d',n:'Shakshuka with cottage cheese and salad',t:'dairy',f:'eggs,tomato,peppers,onion,cheese,cottage cheese,milk',g:'v,q'},
- {s:'d',n:'Turkey mince stir-fry with vegetables',t:'meat',f:'turkey,broccoli,peppers,carrot,soy,soy sauce,gluten',g:'v,pr,q'},
- {s:'d',n:'Lean beef and bean chilli',t:'meat',f:'beef,beans,tomato,onion,peppers',g:'pr,fill,v'},
- {s:'d',n:'Baked salmon, potatoes and greens',t:'pareve',f:'fish,salmon,potato,broccoli,green beans',g:'pr',h:1},
- {s:'d',n:'Baked cod with a tray of roasted vegetables',t:'pareve',f:'fish,cod,zucchini,peppers,onion,eggplant',g:'v,pr',h:1},
- {s:'d',n:'Chicken and vegetable soup with barley',t:'meat',f:'chicken,carrot,celery,onion,barley,gluten',g:'v,fill',h:1},
- {s:'d',n:'Chicken breast with sweet potato and roasted broccoli',t:'meat',f:'chicken,sweet potato,broccoli',g:'pr,v,fill',h:1},
- {s:'d',n:'Turkey meatballs in tomato sauce with wholewheat pasta',t:'meat',f:'turkey,tomato,onion,wheat,pasta,gluten,eggs',g:'pr,fill'},
- {s:'d',n:'Stuffed peppers with lean beef and rice',t:'meat',f:'beef,peppers,rice,tomato,onion',g:'v,pr,fill'},
- {s:'d',n:'Sea bass with couscous and salad',t:'pareve',f:'fish,sea bass,wheat,couscous,gluten,cucumber,tomato',g:'pr,q',h:1},
- {s:'d',n:'Vegetable and tofu curry with brown rice',t:'pareve',f:'tofu,soy,cauliflower,peppers,spinach,onion,rice,coconut',g:'v,fill'},
- {s:'d',n:'Cheese and vegetable frittata with a green salad',t:'dairy',f:'eggs,cheese,milk,zucchini,spinach,onion,lettuce',g:'v,pr,q',c:1},
- {s:'d',n:'Shabbat: roast chicken (skin on), roasted veg, kugel',t:'meat',f:'chicken,potato,eggs,onion,carrot,zucchini',c:1,sh:1},
- {s:'d',n:'Shabbat: fish starter, chicken soup and salads',t:'meat',f:'fish,chicken,carrot,celery,onion,cucumber,eggs',g:'pr,v',h:1,sh:1},
- {s:'x',n:'Apple or orange with a few almonds',t:'pareve',f:'apple,orange,nuts,almonds',g:'q',h:1},
- {s:'x',n:'Low-fat yoghurt or a protein pudding',t:'dairy',f:'yoghurt,milk',g:'pr,q'},
- {s:'x',n:'Carrot and cucumber sticks with hummus',t:'pareve',f:'carrot,cucumber,chickpeas,sesame,tahini',g:'v,q,fill',h:1},
- {s:'x',n:'Big bowl of vegetable soup',t:'pareve',f:'carrot,zucchini,onion,celery,tomato',g:'v,fill',h:1},
- {s:'x',n:'Two hard-boiled eggs',t:'pareve',f:'eggs',g:'pr,q'},
- {s:'x',n:'Rice cakes with peanut butter',t:'pareve',f:'rice,peanuts',g:'q'},
- {s:'x',n:'Whey protein shake with water',t:'dairy',f:'whey,milk',g:'pr,q'},
- {s:'x',n:'Cottage cheese with cherry tomatoes',t:'dairy',f:'cheese,cottage cheese,milk,tomato',g:'pr,q,v'},
- {s:'x',n:'Roasted chickpeas',t:'pareve',f:'chickpeas',g:'fill,q',h:1},
- {s:'x',n:'Edamame with sea salt',t:'pareve',f:'soy,edamame',g:'pr,q,v',h:1},
- {s:'x',n:'Banana with a small handful of walnuts',t:'pareve',f:'banana,nuts,walnuts',g:'q',h:1},
- {s:'x',n:'Kosher beef or turkey jerky',t:'meat',f:'beef,turkey',g:'pr,q'},
- {s:'x',n:'Air-popped popcorn, about 3 cups',t:'pareve',f:'corn',g:'fill,q',h:1}];
-const SLOTS=[['b','Breakfast',0.25,2],['l','Lunch',0.35,2],['d','Supper',0.30,2],['x','Snacks',0.10,3]];
-const NONKOSHER=/pork|bacon|ham|shrimp|prawn|lobster|crab|shellfish/i;
-function prefMatch(m,k){return k==='fish'?m.f.split(',').includes('fish'):(m.g||'').split(',').includes(PREFS[k][1])}
-function score(m){const p=S.profile;return(p.prefs||[]).filter(k=>prefMatch(m,k)).length+(p.chol?(m.h||0)-(m.c||0):0)}
-function meals(){const p=S.profile,av=(p.avoid||'').toLowerCase().split(',').map(s=>s.trim()).filter(Boolean);
- const al=(p.allergy||[]).flatMap(a=>ALLERGENS[a]?ALLERGENS[a][1]:[]);
- return MEALS.filter(m=>{const ing=m.f.split(','),txt=(m.n+','+m.f).toLowerCase();
-  if(p.kosher&&NONKOSHER.test(m.n))return false;
-  if(ing.some(i=>al.includes(i)))return false;
-  return !av.some(a=>txt.includes(a))})}
-
-/* ---------- Rotation and shuffle ---------- */
-function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);
- t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
-function periodNum(){const rot=S.profile.rotate||2;return Math.floor(Math.floor(new Date(today()+'T12:00').getTime()/864e5)/rot)}
-function periodKey(){return 'p'+(S.profile.rotate||2)+'-'+periodNum()+'-'}
-function picksFor(slot,count){const key=periodKey()+slot,off=S.shuf[key]||0,dow=new Date().getDay(),isSh=dow===5||dow===6;
- const pool=meals().filter(m=>m.s===slot&&(!m.sh||isSh));
- const r=rng(periodNum()*131+slot.charCodeAt(0)*17+off*7919+(S.profile.rotate||2));
- const ranked=pool.map(m=>({m,k:r()-score(m)*0.35})).sort((a,b)=>a.k-b.k).map(x=>x.m);
- const out=ranked.slice(0,count);
- if(isSh&&S.profile.shabbat!==false&&(slot==='l'||slot==='d')&&out.length&&!out.some(m=>m.sh)){const sh=ranked.find(m=>m.sh);if(sh)out[out.length-1]=sh}
- return{out,pool}}
-function shuffleSlot(s){const k=periodKey()+s;S.shuf[k]=(S.shuf[k]||0)+1;save();renderDiet()}
-function shuffleAll(){SLOTS.forEach(([s])=>{const k=periodKey()+s;S.shuf[k]=(S.shuf[k]||0)+1});save();renderDiet()}
-function pruneShuffles(){const pk=periodKey();Object.keys(S.shuf).forEach(k=>{if(!k.startsWith(pk))delete S.shuf[k]})}
-function mealTags(m){const p=S.profile;let tg='';
- if(p.kosher)tg+=`<span class="tag ${m.t}">${m.t}</span>`;
- (p.prefs||[]).forEach(k=>{if(prefMatch(m,k))tg+=`<span class="tag pref">${PREFS[k][2]}</span>`});
- if(p.chol&&m.h)tg+='<span class="tag heart">heart-friendly</span>';
- if(p.chol&&m.c)tg+='<span class="tag occ">occasional</span>';return tg}
-
-const PREF_TIPS={
- veg:['Fill half your plate with vegetables at lunch and supper.','Add a side salad or a tray of roasted veg to any meal.','Keep cut veg in the fridge for easy snacks.'],
- fill:['Start meals with a salad or a bowl of soup.','Bulk up dishes with extra veg, beans and lentils.','Choose potatoes, oats and wholegrains over pastries and white bread.'],
- protein:['Your protein target is raised to 2 g per kg.','Have a palm or two of protein at every meal.','Use yoghurt, eggs, cottage cheese or a shake as snacks.'],
- fish:['Aim for fish two or three times a week.','Tinned tuna, sardines and salmon are quick, cheap options.'],
- quick:['Batch-cook chicken, rice and lentils on Sunday for the week.','Keep tins of tuna, chickpeas and beans in the cupboard.','Pre-washed salad and frozen veg save a lot of time.']};
-
-function renderDiet(){if(!S.profile){$('plan').innerHTML='<div class="card">Fill in Settings first.</div>';return}
- pruneShuffles();
- const p=S.profile,t=targets(),d=today(),tgt=targetFor(d),f=S.food[d]||{k:0,p:0},prefs=p.prefs||[];
- const pct=Math.min(100,f.k/tgt*100),left=tgt-f.k;
- let h=`<div class="card"><h3>Today</h3>
-  <div class="row"><div><small>Eaten</small><div class="big">${f.k}</div></div>
-  <div><small>Target</small><div class="big" style="color:#e2e8f0">${tgt}</div></div></div>
-  <div class="bar ${left<0?'over':''}"><div style="width:${pct}%"></div></div>
-  <p>${left>=0?`<b>${left}</b> kcal left`:`<b>${-left}</b> kcal over`} &middot; Protein <b>${f.p}</b> / ${t.protein} g</p>
-  <div class="row"><div><label>Calories</label><input id="kc" type="number" inputmode="numeric"></div>
-  <div><label>Protein (g)</label><input id="pr" type="number" inputmode="numeric"></div></div>
-  <div class="row"><button onclick="addFood()">Add meal</button><button class="sec" onclick="setFood()">Set day total</button></div>
-  <button class="sec" onclick="clearFood()">Clear today</button>
-  <p><small>Scan meals in your photo app, then add each one here, or enter the day's total.</small></p></div>`;
- const wml=S.water[d]||0,wg=waterGoal(),bt=bottleSize();
- h+=`<div class="card"><h3>Water</h3>
-  <div class="big" style="color:#38bdf8">${(wml/1000).toFixed(2)} L <small>of ${(wg/1000).toFixed(1)} L</small></div>
-  <div class="bar wbar"><div style="width:${Math.min(100,wml/wg*100)}%"></div></div>
-  <p><small>${wml>=wg?'Goal reached, nice one.':`About ${Math.ceil((wg-wml)/250)} cups or ${((wg-wml)/bt).toFixed(1)} bottles to go.`}</small></p>
-  <div class="row"><button class="blue" onclick="addWater(250)">+ Cup (250 ml)</button><button class="blue" onclick="addWater(${bt})">+ Bottle (${bt} ml)</button></div>
-  <div class="row"><button class="sec" onclick="addWater(-250)">Undo cup</button><button class="sec" onclick="addWater(-${bt})">Undo bottle</button></div></div>`;
- const r10=x=>Math.round(x/10)*10,rotTxt={1:'every day',2:'every 2 days',3:'every 3 days',7:'every week'}[p.rotate||2];
- h+=`<div class="card"><h3>Today's menu</h3><small>New picks ${rotTxt}. Tap Shuffle for something different. Snacks are optional.`;
- if(p.kosher)h+=' Tagged meat, dairy or pareve; follow your own custom for waiting between meat and dairy.';
- h+='</small>';
- SLOTS.forEach(([k,name,frac,count])=>{const {out,pool}=picksFor(k,count);
-  h+=`<div class="slothead"><h4>${name}</h4><button class="mini" onclick="shuffleSlot('${k}')">Shuffle</button></div>
-   <small>about ${r10(tgt*frac)} kcal &middot; ${Math.round(t.protein*frac)} g protein &middot; ${k==='x'?'pick one or two':'pick one'}</small>`;
-  if(prefs.includes('veg')&&k!=='x')h+='<br><small>Add a side salad or a portion of cooked veg.</small>';
-  if(!out.length){h+='<p><small>No ideas left after your filters. Try loosening one in Settings.</small></p>';return}
-  h+='<ul>'+out.map(m=>`<li>${m.n}${mealTags(m)}</li>`).join('')+'</ul>';
-  const rest=pool.filter(m=>!out.includes(m));
-  if(rest.length)h+=`<details><summary>See all ${pool.length} ideas</summary><ul>${rest.map(m=>`<li>${m.n}${mealTags(m)}</li>`).join('')}</ul></details>`});
- h+='<button class="sec" onclick="shuffleAll()">Shuffle the whole menu</button></div>';
- if(prefs.length)h+='<div class="card"><h3>Tips for your preferences</h3>'+prefs.map(k=>`<h4 style="margin-top:12px">${PREFS[k][0]}</h4><ul>${PREF_TIPS[k].map(x=>`<li>${x}</li>`).join('')}</ul>`).join('')+'</div>';
- if(p.chol)h+=`<div class="card"><h3>Cholesterol tips</h3><ul>
-  <li>Eat oats, barley, beans and lentils often. Their soluble fibre helps lower LDL.</li>
-  <li>Have fish such as salmon or sardines twice a week.</li>
-  <li>Cook with olive oil instead of butter, margarine or schmaltz.</li>
-  <li>Pick lean meat, skinless chicken and 0 to 5% dairy.</li>
-  <li>Keep pastries, fried food and processed meats occasional.</li></ul>
-  <small>General guidance only. Follow your doctor's advice and get your levels checked.</small></div>`;
- let wk=0,wkT=0,rows='';
- for(let i=6;i>=0;i--){const dd=new Date();dd.setDate(dd.getDate()-i);const s=ymd(dd),e=S.food[s],tg=targetFor(s),wa=S.water[s];
-  wkT+=tg;if(e)wk+=e.k;rows+=`<tr><td>${dd.toLocaleDateString('en-GB',{weekday:'short',day:'numeric'})}</td><td>${e?e.k:'-'}</td><td><small>${tg}</small></td><td>${wa?(wa/1000).toFixed(1)+' L':'-'}</td></tr>`}
- h+=`<div class="card"><h3>Last 7 days</h3><table><tr><td><small>Day</small></td><td><small>Eaten</small></td><td><small>Target</small></td><td><small>Water</small></td></tr>${rows}</table>
-  <p>Logged total: <b>${wk}</b> of ${wkT} kcal</p></div>`;
- h+=`<div class="card"><h3>Your targets</h3>`;
- h+=(p.shabbat&&t.extra>0)?`<p>Sunday to Thursday: <b>${t.weekday}</b><br>Friday and Saturday: <b>${t.weekend}</b></p><small>Same weekly total (an average of ${t.avg} a day).</small>`:`<p>Every day: <b>${t.avg}</b> kcal</p>`;
- h+=`<p><small>Maintenance is about ${t.tdee} kcal${S.adj?`. Adjusted ${S.adj>0?'+':''}${S.adj} kcal based on your progress`:''}.</small></p>
-  <p>Protein: <b>${t.protein} g</b> &middot; Water: <b>${(wg/1000).toFixed(1)} L</b> &middot; Steps: <b>8,000+</b> &middot; Sleep: <b>7 to 9 h</b></p></div>`;
- $('plan').innerHTML=h}
-
-/* ---------- Training + editor ---------- */
-const LIB={
- full:{A:['Squat','Bench press','Barbell row','Romanian deadlift','Lateral raise','Plank'],
-       B:['Deadlift','Overhead press','Lat pulldown','Split squat','Cable fly','Hanging knee raise'],
-       C:['Leg press','Incline DB press','Seated cable row','Hip thrust','Face pull','Ab wheel']},
- ul:{Upper:['Bench press','Barbell row','Overhead press','Lat pulldown','Biceps curl','Triceps pushdown'],
-     Lower:['Squat','Romanian deadlift','Leg press','Leg curl','Calf raise','Plank']},
- ppl:{Push:['Bench press','Overhead press','Incline DB press','Lateral raise','Triceps pushdown','Cable fly'],
-      Pull:['Deadlift','Pull-ups or Lat pulldown','Seated cable row','Face pull','Biceps curl','Hammer curl'],
-      Legs:['Squat','Romanian deadlift','Leg press','Leg curl','Calf raise','Hanging knee raise']}};
-let editing=null;
-function exFor(k){const sp=S.profile.split;return(S.custom[sp]&&S.custom[sp][k])||LIB[sp][k]}
-function editW(k){editing=k;renderTrain()}
-function saveW(k){const sp=S.profile.split,list=$('ed').value.split('\n').map(s=>s.trim()).filter(Boolean);
- if(!list.length)return alert('Add at least one exercise.');S.custom[sp]=S.custom[sp]||{};S.custom[sp][k]=list;editing=null;save();renderTrain()}
-function resetW(k){const sp=S.profile.split;if(S.custom[sp])delete S.custom[sp][k];editing=null;save();renderTrain()}
-function renderTrain(){if(!S.profile){$('train').innerHTML='<div class="card">Fill in Settings first.</div>';return}
- const p=S.profile,keys=Object.keys(LIB[p.split]);
- const note={straight:'3 sets of 6 to 12 reps. Rest 1.5 to 2 minutes.',
-  superset:'Exercises are paired in the order listed (A1 then A2). Do them back to back, rest 60 to 90 seconds, repeat 3 times.',
-  circuit:'Do every exercise once for 10 to 12 reps with little rest, then rest 2 minutes. 3 to 4 rounds.'}[p.style];
- let h=`<div class="card"><h3>How to train</h3><small>${note} When every set feels solid, add weight or a rep. Tap Edit to change any workout.</small></div>`;
- const shown=[];for(let i=0;i<p.days;i++)shown.push(keys[i%keys.length]);
- shown.forEach((k,i)=>{const ex=exFor(k);h+=`<div class="card"><h3>Day ${i+1}: ${k}</h3>`;
-  if(editing===k&&shown.indexOf(k)===i){h+=`<small>One exercise per line, e.g. "Squat 4x6". Order matters for supersets.</small>
-   <textarea id="ed">${ex.join('\n')}</textarea>
-   <div class="row"><button onclick="saveW('${k}')">Save</button><button class="sec" onclick="resetW('${k}')">Reset</button></div>
-   <button class="sec" onclick="editing=null;renderTrain()">Cancel</button>`}
-  else{if(p.style==='superset'){h+='<ul>';for(let j=0;j<ex.length;j+=2){const L=String.fromCharCode(65+j/2);
-    h+=`<li><b>${L}1</b> ${ex[j]}${ex[j+1]?`<br><b>${L}2</b> ${ex[j+1]}`:''}</li>`}h+='</ul>'}
-   else{const tg=p.style==='circuit'?'ol':'ul';h+=`<${tg}>`+ex.map(e=>`<li>${e}</li>`).join('')+`</${tg}>`}
-   h+=`<button class="sec" onclick="editW('${k}')">Edit</button>`}
-  h+='</div>'});
- $('train').innerHTML=h}
-
-/* ---------- Progress and auto-adjust ---------- */
-function logWeight(){const w=+$('newW').value;if(!w)return;const d=today();S.logs=S.logs.filter(l=>l.d!==d);
- S.logs.push({d,w});S.logs.sort((a,b)=>a.d<b.d?-1:1);adjust();save();$('newW').value='';renderLog()}
-function avg(a,b){const xs=S.logs.filter(l=>{const g=daysAgo(l.d);return g>=a&&g<b}).map(l=>l.w);
- return xs.length?xs.reduce((x,y)=>x+y)/xs.length:null}
-function adjust(){const last=avg(0,7),prev=avg(7,14);if(!last||!prev)return;
- if(S.lastAdj&&daysAgo(S.lastAdj)<7)return;
- const rate=(prev-last)/prev*100;if(rate<0.25)S.adj-=150;else if(rate>1)S.adj+=150;else return;
- S.adj=Math.max(-600,Math.min(300,S.adj));S.lastAdj=today()}
-function renderLog(){const last=avg(0,7),prev=avg(7,14);let h='<h3>Progress</h3>';
- if(last)h+=`<p>This week's average: <b>${last.toFixed(1)} kg</b></p>`;
- if(last&&prev){const r=(prev-last)/prev*100;h+=`<p>Change from last week: <b>${(last-prev).toFixed(1)} kg</b><br><small>${r.toFixed(2)}% a week. The target is 0.25 to 1%.</small></p>`}
- h+='<ul>'+S.logs.slice(-14).reverse().map(l=>`<li>${l.d}: ${l.w} kg</li>`).join('')+'</ul>';$('history').innerHTML=h}
-
-/* ---------- Start ---------- */
-if(S.profile){FIELDS.forEach(f=>{if(S.profile[f])$(f).value=S.profile[f]});CHECKS.forEach(c=>$(c).checked=!!S.profile[c]);
- (S.profile.allergy||[]).forEach(a=>{const e=$('al-'+a);if(e)e.checked=true});
- (S.profile.prefs||[]).forEach(a=>{const e=$('pf-'+a);if(e)e.checked=true});tab('plan')}
-else tab('profile');
-</script>
+<script src="meals.js"></script>
+<script src="app.js"></script>
 </body>
 </html>

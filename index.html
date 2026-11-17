@@ -10,7 +10,7 @@
 header{padding:16px;text-align:center;font-size:20px;font-weight:700;background:#1e293b}
 main{padding:14px;max-width:520px;margin:auto;padding-bottom:80px}
 .card{background:#1e293b;border-radius:14px;padding:16px;margin-bottom:14px}
-h3{margin:0 0 6px}label{display:block;margin:10px 0 4px;font-size:14px;color:#94a3b8}
+h3{margin:0 0 6px}h4{margin:14px 0 2px;color:#22c55e}label{display:block;margin:10px 0 4px;font-size:14px;color:#94a3b8}
 input,select,button,textarea{width:100%;padding:12px;font-size:16px;border-radius:10px;border:1px solid #334155;background:#0f172a;color:#e2e8f0}
 textarea{min-height:170px;font-family:inherit}
 input[type=checkbox]{width:auto;margin-right:8px}.chk{display:flex;align-items:center;color:#e2e8f0}
@@ -54,6 +54,13 @@ table{width:100%;border-collapse:collapse}td{padding:6px 0;border-bottom:1px sol
   <label>Foods to avoid (comma separated)</label><input id="avoid" placeholder="e.g. fish, nuts">
  </div>
  <button onclick="saveProfile()">Save & build my plan</button>
+ <div class="card" style="margin-top:14px"><h3>Your data</h3>
+  <small>Spreadsheet: your weigh-ins and daily calories, for Excel, Google Sheets or other apps.<br>Backup: everything, including settings and custom workouts, which you can import back here.</small>
+  <button class="sec" onclick="exportCSV()">Export spreadsheet (CSV)</button>
+  <button class="sec" onclick="exportBackup()">Export full backup</button>
+  <button class="sec" onclick="$('imp').click()">Import backup</button>
+  <input type="file" id="imp" accept=".json,application/json" class="hide" onchange="importBackup(this)">
+ </div>
 </section>
 <section id="plan" class="hide"></section>
 <section id="train" class="hide"></section>
@@ -89,6 +96,24 @@ function saveProfile(){const p={};FIELDS.forEach(f=>p[f]=$(f).value);CHECKS.forE
  S.profile=p;if(!S.logs.length)S.logs.push({d:today(),w:p.weight});save();tab('plan')}
 const curW=()=>S.logs.length?S.logs[S.logs.length-1].w:S.profile.weight;
 
+/* ---------- Export / import ---------- */
+function shareFile(name,text,type){const file=new File([text],name,{type});
+ if(navigator.canShare&&navigator.canShare({files:[file]})){navigator.share({files:[file]}).catch(()=>{});return}
+ const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=name;document.body.appendChild(a);a.click();a.remove()}
+function exportCSV(){const dates=new Set([...S.logs.map(l=>l.d),...Object.keys(S.food)]);
+ if(!dates.size)return alert('Nothing logged yet.');
+ const rows=[['date','weight_kg','calories','protein_g','target_kcal']];
+ [...dates].sort().forEach(d=>{const w=S.logs.find(l=>l.d===d),f=S.food[d];
+  rows.push([d,w?w.w:'',f?f.k:'',f?f.p:'',S.profile?targetFor(d):''])});
+ shareFile('fatloss-'+today()+'.csv',rows.map(r=>r.join(',')).join('\n'),'text/csv')}
+function exportBackup(){shareFile('fatloss-backup-'+today()+'.json',JSON.stringify(S,null,1),'application/json')}
+function importBackup(inp){const file=inp.files[0];if(!file)return;const rd=new FileReader();
+ rd.onload=()=>{try{const d=JSON.parse(rd.result);if(!d||typeof d!=='object'||!('logs' in d))throw 0;
+   if(!confirm('This replaces everything currently in the app with the backup. Continue?'))return;
+   localStorage.setItem('flc',JSON.stringify(d));location.reload()}
+  catch(e){alert('That file is not a FatLoss Coach backup.')}finally{inp.value=''}};
+ rd.readAsText(file)}
+
 /* ---------- Calorie targets ---------- */
 function targets(){const p=S.profile,w=curW();
  const bmr=10*w+6.25*p.height-5*p.age+(p.sex==='m'?5:-161),tdee=bmr*p.act;
@@ -107,20 +132,28 @@ function addFood(){const k=+$('kc').value,pr=+$('pr').value||0;if(!k)return;cons
 function setFood(){const k=+$('kc').value,pr=+$('pr').value||0;if(!k&&!pr)return;S.food[today()]={k,p:pr};save();renderDiet()}
 function clearFood(){delete S.food[today()];save();renderDiet()}
 
-/* ---------- Meal ideas ---------- */
+/* ---------- Meal ideas (s = slot: b breakfast, l lunch, d supper, x snack) ---------- */
 const MEALS=[
- {n:'Greek yoghurt, berries and oats',t:'dairy',f:'yoghurt,oats'},
- {n:'Shakshuka with cottage cheese and salad',t:'dairy',f:'eggs,cheese'},
- {n:'Omelette with veg and feta',t:'dairy',f:'eggs,cheese'},
- {n:'Grilled chicken breast, rice and salad',t:'meat',f:'chicken,rice'},
- {n:'Turkey mince stir-fry with vegetables',t:'meat',f:'turkey'},
- {n:'Lean beef and bean chilli',t:'meat',f:'beef,beans'},
- {n:'Baked salmon, potatoes and greens',t:'pareve',f:'fish,salmon'},
- {n:'Tuna salad wrap',t:'pareve',f:'fish,tuna,wheat'},
- {n:'Lentil soup with wholegrain bread',t:'pareve',f:'lentils,wheat'},
- {n:'Tofu and chickpea bowl with tahini',t:'pareve',f:'tofu,chickpeas,sesame'},
- {n:'Shabbat: roast chicken, roasted veg, small portion of kugel',t:'meat',f:'chicken,potato'},
- {n:'Shabbat: lighter cholent with lean beef and extra beans',t:'meat',f:'beef,beans,barley'}];
+ {s:'b',n:'Greek yoghurt, berries and oats',t:'dairy',f:'yoghurt,oats'},
+ {s:'b',n:'Omelette with veg and feta, wholegrain toast',t:'dairy',f:'eggs,cheese,wheat'},
+ {s:'b',n:'Cottage cheese on rice cakes with tomato',t:'dairy',f:'cheese'},
+ {s:'b',n:'Overnight oats with protein powder and banana',t:'dairy',f:'oats,milk'},
+ {s:'l',n:'Grilled chicken breast, rice and salad',t:'meat',f:'chicken,rice'},
+ {s:'l',n:'Tuna salad wrap',t:'pareve',f:'fish,tuna,wheat'},
+ {s:'l',n:'Lentil soup with wholegrain bread',t:'pareve',f:'lentils,wheat'},
+ {s:'l',n:'Tofu and chickpea bowl with tahini',t:'pareve',f:'tofu,chickpeas,sesame'},
+ {s:'l',n:'Shabbat: lighter cholent with lean beef and extra beans',t:'meat',f:'beef,beans,barley'},
+ {s:'d',n:'Shakshuka with cottage cheese and salad',t:'dairy',f:'eggs,cheese'},
+ {s:'d',n:'Turkey mince stir-fry with vegetables',t:'meat',f:'turkey'},
+ {s:'d',n:'Lean beef and bean chilli',t:'meat',f:'beef,beans'},
+ {s:'d',n:'Baked salmon, potatoes and greens',t:'pareve',f:'fish,salmon'},
+ {s:'d',n:'Shabbat: roast chicken, roasted veg, small portion of kugel',t:'meat',f:'chicken,potato'},
+ {s:'x',n:'Apple or orange with a few almonds',t:'pareve',f:'nuts,almonds'},
+ {s:'x',n:'Low-fat yoghurt or a protein pudding',t:'dairy',f:'yoghurt,milk'},
+ {s:'x',n:'Carrot and cucumber sticks with hummus',t:'pareve',f:'chickpeas,sesame'},
+ {s:'x',n:'Two hard-boiled eggs',t:'pareve',f:'eggs'},
+ {s:'x',n:'Protein shake with water',t:'pareve',f:'milk'}];
+const SLOTS=[['b','Breakfast',0.25],['l','Lunch',0.35],['d','Supper',0.30],['x','Snacks',0.10]];
 const NONKOSHER=/pork|bacon|ham|shrimp|prawn|lobster|crab|shellfish/i;
 function meals(){const p=S.profile,av=(p.avoid||'').toLowerCase().split(',').map(s=>s.trim()).filter(Boolean);
  return MEALS.filter(m=>!(p.kosher&&NONKOSHER.test(m.n))&&!av.some(a=>(m.n+','+m.f).toLowerCase().includes(a)))}
@@ -138,6 +171,14 @@ function renderDiet(){if(!S.profile){$('plan').innerHTML='<div class="card">Fill
   <div class="row"><button onclick="addFood()">Add meal</button><button class="sec" onclick="setFood()">Set day total</button></div>
   <button class="sec" onclick="clearFood()">Clear today</button>
   <p><small>Scan meals in your photo app, then add each one here, or just enter the day's total from it.</small></p></div>`;
+ const all=meals(),r10=x=>Math.round(x/10)*10;
+ h+=`<div class="card"><h3>Meal ideas for today</h3><small>Rough split of today's ${tgt} kcal. Snacks are optional; if you skip them, add those calories to a main meal.`;
+ if(p.kosher)h+=' Each idea is tagged meat, dairy or pareve; follow your own custom for waiting between meat and dairy.';
+ h+='</small>';
+ SLOTS.forEach(([k,name,frac])=>{const list=all.filter(m=>m.s===k);if(!list.length)return;
+  h+=`<h4>${name} <small>about ${r10(tgt*frac)} kcal &middot; ${Math.round(t.protein*frac)} g protein</small></h4><ul>`+
+   list.map(m=>`<li>${m.n}${p.kosher?`<span class="tag ${m.t}">${m.t}</span>`:''}</li>`).join('')+'</ul>'});
+ h+='</div>';
  let wk=0,wkT=0,rows='';
  for(let i=6;i>=0;i--){const dd=new Date();dd.setDate(dd.getDate()-i);const s=ymd(dd),e=S.food[s],tg=targetFor(s);
   wkT+=tg;if(e)wk+=e.k;rows+=`<tr><td>${dd.toLocaleDateString('en-GB',{weekday:'short',day:'numeric'})}</td><td>${e?e.k:'-'}</td><td><small>${tg}</small></td></tr>`}
@@ -148,9 +189,6 @@ function renderDiet(){if(!S.profile){$('plan').innerHTML='<div class="card">Fill
  else h+=`<p>Every day: <b>${t.avg}</b> kcal</p>`;
  h+=`<p><small>Maintenance is about ${t.tdee} kcal${S.adj?`. Adjusted ${S.adj>0?'+':''}${S.adj} kcal based on your progress`:''}.</small></p>
   <p>Protein: <b>${t.protein} g</b> &middot; Steps: <b>8,000+</b> &middot; Sleep: <b>7 to 9 h</b></p></div>`;
- h+='<div class="card"><h3>Meal ideas</h3>';
- if(p.kosher)h+='<small>Each one is tagged meat, dairy or pareve. Follow your own custom for waiting between meat and dairy.</small>';
- h+='<ul>'+meals().map(m=>`<li>${m.n}${p.kosher?`<span class="tag ${m.t}">${m.t}</span>`:''}</li>`).join('')+'</ul></div>';
  $('plan').innerHTML=h}
 
 /* ---------- Training + editor ---------- */

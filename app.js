@@ -161,18 +161,7 @@ function renderDiet(){if(!S.profile){$('plan').innerHTML='<div class="card">Fill
   <div class="row"><button class="blue" onclick="addWater(250)">+ Cup (250 ml)</button><button class="blue" onclick="addWater(${bt})">+ Bottle (${bt} ml)</button></div>
   <div class="row"><button class="sec" onclick="addWater(-250)">Undo cup</button><button class="sec" onclick="addWater(-${bt})">Undo bottle</button></div></div>`;
  const r10=x=>Math.round(x/10)*10,rotTxt={1:'every day',2:'every 2 days',3:'every 3 days',7:'every week'}[p.rotate||2];
- h+=`<div class="card"><h3>Today's menu</h3><small>New picks ${rotTxt}. Tap Shuffle for something different. Snacks are optional.`;
- if(p.kosher)h+=' Tagged meat, dairy or pareve; follow your own custom for waiting between meat and dairy.';
- h+='</small>';
- SLOTS.forEach(([k,name,frac,count])=>{const {out,pool}=picksFor(k,count);
-  h+=`<div class="slothead"><h4>${name}</h4><button class="mini" onclick="shuffleSlot('${k}')">Shuffle</button></div>
-   <small>about ${r10(tgt*frac)} kcal &middot; ${Math.round(t.protein*frac)} g protein &middot; ${k==='x'?'pick one or two':'pick one'}</small>`;
-  if(prefs.includes('veg')&&k!=='x')h+='<br><small>Add a side salad or a portion of cooked veg.</small>';
-  if(!out.length){h+='<p><small>No ideas left after your filters. Try loosening one in Settings.</small></p>';return}
-  h+='<ul>'+out.map(m=>`<li>${esc(m.n)}${mealTags(m)}</li>`).join('')+'</ul>';
-  const rest=pool.filter(m=>!out.includes(m));
-  if(rest.length)h+=`<details><summary>See all ${pool.length} ideas</summary><ul>${rest.map(m=>`<li>${esc(m.n)}${mealTags(m)}</li>`).join('')}</ul></details>`});
- h+='<button class="sec" onclick="shuffleAll()">Shuffle the whole menu</button></div>';
+ h+=builderHTML();
  if(prefs.length)h+='<div class="card"><h3>Tips for your preferences</h3>'+prefs.map(k=>`<h4 style="margin-top:12px">${PREFS[k][0]}</h4><ul>${PREF_TIPS[k].map(x=>`<li>${x}</li>`).join('')}</ul>`).join('')+'</div>';
  if(p.chol)h+=`<div class="card"><h3>Cholesterol tips</h3><ul>
   <li>Eat oats, barley, beans and lentils often. Their soluble fibre helps lower LDL.</li>
@@ -289,6 +278,132 @@ function showRecipe(m){closeRecipe();
  sh.appendChild(a);sh.appendChild(c);d.appendChild(sh);
  d.onclick=e=>{if(e.target===d)closeRecipe()};document.body.appendChild(d)}
 
+/* ---------- Meal builder ----------
+ v = grams of the nutrient per 100 g, or per unit when u is set. t = kosher type. sn = suits a snack. */
+const BUILD={
+ protein:{label:'Protein',items:[
+  {n:'Chicken breast, cooked',v:31,t:'meat',f:'chicken'},
+  {n:'Chicken thigh, skinless, cooked',v:25,t:'meat',f:'chicken'},
+  {n:'Turkey breast, cooked',v:29,t:'meat',f:'turkey'},
+  {n:'Sliced turkey breast (deli)',v:20,t:'meat',f:'turkey',sn:1},
+  {n:'Lean beef mince, 5%, cooked',v:26,t:'meat',f:'beef'},
+  {n:'Lean beef steak, cooked',v:28,t:'meat',f:'beef'},
+  {n:'Salmon, cooked',v:22,t:'pareve',f:'fish,salmon'},
+  {n:'Tuna in water, drained',v:25,t:'pareve',f:'fish,tuna',sn:1},
+  {n:'White fish (cod, tilapia, denis), cooked',v:20,t:'pareve',f:'fish,cod'},
+  {n:'Sardines, tinned',v:25,t:'pareve',f:'fish,sardines'},
+  {n:'Eggs',u:'egg',v:6.3,t:'pareve',f:'eggs',sn:1},
+  {n:'Egg whites',v:11,t:'pareve',f:'eggs'},
+  {n:'Greek yoghurt, 0%',v:10,t:'dairy',f:'yoghurt,milk',sn:1},
+  {n:'Skyr',v:11,t:'dairy',f:'yoghurt,skyr,milk',sn:1},
+  {n:'Cottage cheese, 5%',v:11,t:'dairy',f:'cheese,cottage cheese,milk',sn:1},
+  {n:'Light white cheese, 5%',v:9,t:'dairy',f:'cheese,milk',sn:1},
+  {n:'Firm tofu',v:14,t:'pareve',f:'tofu,soy'},
+  {n:'Edamame',v:11,t:'pareve',f:'soy,edamame',sn:1},
+  {n:'Whey protein',u:'scoop',v:24,t:'dairy',f:'whey,milk',sn:1},
+  {n:'Plant protein powder',u:'scoop',v:20,t:'pareve',f:'pea protein',sn:1}]},
+ carbs:{label:'Carbs',items:[
+  {n:'Rice, cooked',v:28,f:'rice'},
+  {n:'Wholewheat pasta, cooked',v:30,f:'wheat,pasta,gluten'},
+  {n:'Potatoes, cooked',v:17,f:'potato'},
+  {n:'Sweet potato, cooked',v:20,f:'sweet potato'},
+  {n:'Quinoa, cooked',v:21,f:'quinoa'},
+  {n:'Couscous, cooked',v:23,f:'wheat,couscous,gluten'},
+  {n:'Bulgur, cooked',v:19,f:'wheat,bulgur,gluten'},
+  {n:'Lentils, cooked',v:20,f:'lentils'},
+  {n:'Chickpeas, cooked',v:27,f:'chickpeas'},
+  {n:'Black or kidney beans, cooked',v:23,f:'beans'},
+  {n:'Corn',v:19,f:'corn'},
+  {n:'Oats, dry',v:60,f:'oats',sn:1},
+  {n:'Wholegrain bread',u:'slice',v:15,f:'wheat,bread,gluten',sn:1},
+  {n:'Small pitta',u:'pitta',v:30,f:'wheat,bread,gluten'},
+  {n:'Wholewheat tortilla',u:'tortilla',v:28,f:'wheat,gluten'},
+  {n:'Rice cakes',u:'rice cake',v:7,f:'rice',sn:1},
+  {n:'Banana',u:'banana',v:25,f:'banana',sn:1},
+  {n:'Apple',u:'apple',v:20,f:'apple',sn:1},
+  {n:'Berries',v:12,f:'berries',sn:1},
+  {n:'Dates, medjool',u:'date',v:18,f:'dates',sn:1}]},
+ fat:{label:'Fat',items:[
+  {n:'Olive oil',u:'tsp',v:4.5,f:'olive oil'},
+  {n:'Avocado',v:15,f:'avocado'},
+  {n:'Almonds',v:50,f:'nuts,almonds'},
+  {n:'Walnuts',v:65,f:'nuts,walnuts'},
+  {n:'Peanut butter',u:'tbsp',v:8,f:'peanuts'},
+  {n:'Raw tahini',u:'tbsp',v:8,f:'sesame,tahini'},
+  {n:'Hummus',u:'tbsp',v:2.5,f:'chickpeas,sesame,tahini'},
+  {n:'Olives',v:11,f:'olives'},
+  {n:'Chia or flax seeds',u:'tbsp',v:4.5,f:'seeds,flaxseed'},
+  {n:'Light feta',v:10,t:'dairy',f:'cheese,feta,milk'}]}};
+const VEG=['Cucumber','Tomato','Peppers','Leafy greens','Broccoli','Courgette','Carrots','Cauliflower','Mushrooms','Aubergine','Green beans','Onion'];
+const UNITS={egg:'eggs',scoop:'scoops',slice:'slices',pitta:'pittas',tortilla:'tortillas','rice cake':'rice cakes',banana:'bananas',apple:'apples',date:'dates',tsp:'tsp',tbsp:'tbsp'};
+function dayMacros(kcal){const p=targets().protein,f=Math.round(kcal*0.27/9);
+ return{p,f,c:Math.max(0,Math.round((kcal-p*4-f*9)/4))}}
+function amt(it,g){
+ if(it.u==='egg'){const e=g/it.v;if(e<=4)return Math.max(1,Math.round(e))+(Math.round(e)>1?' eggs':' egg');
+  return '2 eggs + '+Math.round((g-2*it.v)/3.6)+' egg whites'}
+ if(it.u){const n=Math.max(it.u==='tsp'?1:0.5,Math.round(g/it.v*2)/2);return n+' '+(n>1?UNITS[it.u]:it.u)}
+ return Math.max(10,Math.round(g/it.v*100/10)*10)+' g'}
+function optLabel(it,g){const a=amt(it,g),nm=it.n.toLowerCase();
+ if(it.u&&nm.startsWith(it.u)){if(it.u==='egg')return a;const num=a.split(' ')[0];return num+' '+(+num>1?UNITS[it.u]:it.u)+nm.slice(nm.indexOf(',')>0?nm.indexOf(','):nm.length)}
+ return a+' '+nm}
+function okItem(it){const p=S.profile,av=(p.avoid||'').split(',').map(s=>s.trim()).filter(Boolean);
+ const al=(p.allergy||[]).flatMap(a=>ALLERGENS[a]?ALLERGENS[a][1]:[]);
+ if((it.f||'').split(',').some(x=>al.includes(x.trim())))return false;
+ return !avoidHit({n:it.n,f:it.f||''},av)}
+function mealPlan(){const p=S.profile,m=+(p.meals||3),s=+(p.snacks!==undefined&&p.snacks!==''?p.snacks:1);
+ const sf=s?Math.min(0.1,0.3/s):0,rest=1-sf*s;
+ const names={1:['Main meal'],2:['First meal','Second meal'],3:['Breakfast','Lunch','Supper'],4:['Breakfast','Lunch','Afternoon meal','Supper']}[m];
+ const w=names.map((x,i)=>m>=3&&i===0?0.8:1),ws=w.reduce((a,b)=>a+b,0);
+ const out=[];let left=s;
+ names.forEach((n,i)=>{out.push({name:n,frac:rest*w[i]/ws,snack:false});
+  if(left>0&&i<names.length-1){out.push({name:'Snack',frac:sf,snack:true});left--}});
+ for(;left>0;left--)out.push({name:left===1&&out.length>1?'Evening snack':'Snack',frac:sf,snack:true});
+ return out}
+function setPlan(k,v){S.profile[k]=+v;save();renderDiet()}
+S.picks=S.picks||{};
+function pickSel(key,v){const d=today(),P=S.picks[d]=S.picks[d]||{};
+ if(v==='')delete P[key];else P[key]=+v;
+ Object.keys(S.picks).forEach(k=>{if(k!==d)delete S.picks[k]});save();renderDiet()}
+(function(){const st=document.createElement('style');st.textContent=
+ '.mtiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}'+
+ '.mtile{border-radius:12px;padding:10px 4px;text-align:center;background:rgba(255,255,255,.06)}'+
+ '.mtile b{display:block;font-size:22px}.mtile small{opacity:.75;font-size:12px}'+
+ '.mp b{color:#f87171}.mc b{color:#fbbf24}.mf b{color:#60a5fa}'+
+ '.planrow{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}.planrow select{width:100%}'+
+ '.mcard{border-radius:12px;padding:12px;margin-top:12px;background:rgba(255,255,255,.04);border-left:4px solid #22c55e}'+
+ '.mcard.snack{border-left-color:#f59e0b}'+
+ '.mealhd{display:flex;justify-content:space-between;align-items:center;gap:8px}.mealhd h4{margin:0}'+
+ '.badge{font-size:11px;font-weight:700;letter-spacing:.05em;padding:2px 8px;border-radius:6px;background:#22c55e;color:#052e16}'+
+ '.snack .badge{background:#f59e0b;color:#3b2003}'+
+ '.mm{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}.mm span{font-size:12px;padding:2px 8px;border-radius:8px;background:rgba(255,255,255,.08)}'+
+ '.mcard label{display:block;margin-top:10px;font-size:13px;opacity:.85}.mcard select{width:100%;margin-top:4px}'+
+ '.mcard .done{color:#22c55e}.warn{color:#fbbf24;font-size:13px;margin-top:8px}';
+ document.head.appendChild(st)})();
+function builderHTML(){const p=S.profile,tgt=targetFor(today()),M=dayMacros(tgt),pc=x=>Math.round(x/tgt*100);
+ const P=S.picks[today()]||{},m=+(p.meals||3),s=+(p.snacks!==undefined&&p.snacks!==''?p.snacks:1),sig=m+'m'+s+'s';
+ let h=`<div class="card"><h3>Your nutrition today</h3><small>${tgt} kcal</small>
+ <div class="mtiles"><div class="mtile mp"><b>${M.p} g</b><small>Protein &middot; ${pc(M.p*4)}%</small></div>
+ <div class="mtile mc"><b>${M.c} g</b><small>Carbs &middot; ${pc(M.c*4)}%</small></div>
+ <div class="mtile mf"><b>${M.f} g</b><small>Fat &middot; ${pc(M.f*9)}%</small></div></div>
+ <div class="planrow"><div><label>Meals a day</label><select onchange="setPlan('meals',this.value)">${[1,2,3,4].map(x=>`<option${x===m?' selected':''}>${x}</option>`).join('')}</select></div>
+ <div><label>Snacks a day</label><select onchange="setPlan('snacks',this.value)">${[0,1,2,3].map(x=>`<option${x===s?' selected':''}>${x}</option>`).join('')}</select></div></div>
+ <small>Most people do well with 3 meals and 0 to 2 snacks, but any pattern works for fat loss as long as you hit your daily totals. Choose what fits your routine.</small>`;
+ mealPlan().forEach((ml,mi)=>{const mp=Math.round(M.p*ml.frac),mc=Math.round(M.c*ml.frac),mf=Math.round(M.f*ml.frac);
+  const groups=[['protein',mp],['carbs',mc]];if(!ml.snack)groups.push(['fat',Math.round(mf*0.5)]);
+  let body='',types=[],picked=0,shown=0;
+  groups.forEach(([g,need])=>{const list=BUILD[g].items.map((it,i)=>({it,i})).filter(x=>okItem(x.it)&&(!ml.snack||x.it.sn||g==='fat'));
+   if(!list.length||need<=0)return;shown++;const key=sig+'-'+mi+'-'+g,sel=P[key];
+   if(sel!==undefined){picked++;const t=BUILD[g].items[sel].t;if(t)types.push(t)}
+   body+=`<label>${BUILD[g].label} <small>(about ${need} g)</small></label><select onchange="pickSel('${key}',this.value)">
+    <option value="">Choose ${BUILD[g].label.toLowerCase()}...</option>${list.map(({it,i})=>`<option value="${i}"${sel===i?' selected':''}>${esc(optLabel(it,need))}${p.kosher&&it.t?' · '+(it.t==='pareve'?'parve':it.t):''}</option>`).join('')}</select>`});
+  if(!ml.snack)body+=`<label>Vegetables <small>(fill half the plate, as much as you like)</small></label><small>${VEG.filter(x=>okItem({n:x,f:x.toLowerCase()})).join(', ')}</small>`;
+  if(p.kosher&&types.includes('meat')&&types.includes('dairy'))body+='<div class="warn">This mixes meat and dairy. Swap one of your picks.</div>';
+  if(mp>60)body+='<div class="warn">That is a lot of protein for one sitting. It is fine, but adding a snack or a shake can make it easier.</div>';
+  h+=`<div class="mcard${ml.snack?' snack':''}"><div class="mealhd"><h4>${ml.name}</h4><span class="badge">${ml.snack?'SNACK':'MEAL'}</span></div>
+   <div class="mm"><span>${Math.round(tgt*ml.frac/10)*10} kcal</span><span>P ${mp} g</span><span>C ${mc} g</span><span>F ${mf} g</span>${picked&&picked===shown?'<span class="done">&#10003; planned</span>':''}</div>${body}</div>`});
+ if(p.kosher)h+='<p><small>Keep each meal meat or dairy. Parve goes with both.</small></p>';
+ return h+'</div>'}
+
 /* ---------- Activity calendar ---------- */
 S.workouts=S.workouts||{};
 S.actTypes=S.actTypes||[{id:'weights',n:'Weights',e:'\u{1F3CB}\uFE0F'},{id:'basketball',n:'Basketball',e:'\u{1F3C0}'},
@@ -374,113 +489,3 @@ if(S.profile){FIELDS.forEach(f=>{if(S.profile[f])$(f).value=S.profile[f]});CHECK
  (S.profile.allergy||[]).forEach(a=>{const e=$('al-'+a);if(e)e.checked=true});
  (S.profile.prefs||[]).forEach(a=>{const e=$('pf-'+a);if(e)e.checked=true});tab('plan')}
 else tab('profile');
-
-/* ---------- Meal builder (replaces the menu) ---------- */
-const BUILD={
- protein:{label:'Protein',items:[
-  {n:'Chicken breast, cooked',v:31,t:'meat',f:'chicken'},
-  {n:'Turkey breast, cooked',v:29,t:'meat',f:'turkey'},
-  {n:'Lean beef, 5% fat, cooked',v:26,t:'meat',f:'beef'},
-  {n:'Salmon, cooked',v:22,t:'pareve',f:'fish,salmon'},
-  {n:'Tuna in water, drained',v:25,t:'pareve',f:'fish,tuna'},
-  {n:'White fish (cod, tilapia, denis)',v:20,t:'pareve',f:'fish,cod'},
-  {n:'Eggs',u:'egg',v:6.3,t:'pareve',f:'eggs'},
-  {n:'Greek yoghurt, 0%',v:10,t:'dairy',f:'yoghurt,milk'},
-  {n:'Cottage cheese, 5%',v:11,t:'dairy',f:'cheese,cottage cheese,milk'},
-  {n:'Firm tofu',v:14,t:'pareve',f:'tofu,soy'},
-  {n:'Whey protein',u:'scoop',v:24,t:'dairy',f:'whey,milk'}]},
- carbs:{label:'Carbs',items:[
-  {n:'Rice, cooked',v:28,f:'rice'},
-  {n:'Wholewheat pasta, cooked',v:30,f:'wheat,pasta,gluten'},
-  {n:'Potatoes',v:17,f:'potato'},
-  {n:'Sweet potato',v:20,f:'sweet potato'},
-  {n:'Quinoa, cooked',v:21,f:'quinoa'},
-  {n:'Couscous, cooked',v:23,f:'wheat,couscous,gluten'},
-  {n:'Oats, dry',v:60,f:'oats'},
-  {n:'Wholegrain bread',u:'slice',v:15,f:'wheat,bread,gluten'},
-  {n:'Small pitta',u:'pitta',v:30,f:'wheat,bread,gluten'},
-  {n:'Banana',u:'banana',v:25,f:'banana'},
-  {n:'Berries',v:12,f:'berries'}]},
- fat:{label:'Fats (added)',items:[
-  {n:'Olive oil',u:'tsp',v:4.5,f:'olive oil'},
-  {n:'Avocado',v:15,f:'avocado'},
-  {n:'Almonds',v:50,f:'nuts,almonds'},
-  {n:'Walnuts',v:65,f:'nuts,walnuts'},
-  {n:'Raw tahini',u:'tbsp',v:8,f:'sesame,tahini'},
-  {n:'Olives',v:11,f:'olives'}]}};
-const VEG=['Cucumber','Tomato','Peppers','Lettuce and leafy greens','Broccoli','Courgette','Carrots','Cauliflower','Mushrooms','Aubergine','Green beans','Onion'];
-const PLURAL={egg:'eggs',scoop:'scoops',slice:'slices',pitta:'pittas',banana:'bananas',tsp:'tsp',tbsp:'tbsp'};
-function dayMacros(kcal){const p=targets().protein,f=Math.round(kcal*0.27/9);
- return{p,f,c:Math.max(0,Math.round((kcal-p*4-f*9)/4))}}
-function amt(it,g){
- if(it.n==='Eggs'){const e=g/it.v;if(e<=4)return Math.max(1,Math.round(e))+' eggs';
-  return '2 eggs + '+Math.round((g-2*it.v)/3.6)+' egg whites'}
- if(it.u){const n=Math.max(it.u==='tsp'?1:0.5,Math.round(g/it.v*2)/2);return n+' '+(n>1?PLURAL[it.u]:it.u)}
- return Math.max(10,Math.round(g/it.v*10)*10)+' g'}
-function okItem(it){const p=S.profile,av=(p.avoid||'').split(',').map(s=>s.trim()).filter(Boolean);
- const al=(p.allergy||[]).flatMap(a=>ALLERGENS[a]?ALLERGENS[a][1]:[]);
- if((it.f||'').split(',').some(x=>al.includes(x.trim())))return false;
- return !avoidHit({n:it.n,f:it.f||''},av)}
-function builderHTML(){const p=S.profile,tgt=targetFor(today()),M=dayMacros(tgt),kos=p.kosher,pc=x=>Math.round(x/tgt*100);
- let h=` Build your meals Today: ${tgt} kcal &middot; protein ${M.p} g (${pc(M.p*4)}%) &middot; carbs ${M.c} g (${pc(M.c*4)}%) &middot; fat ${M.f} g (${pc(M.f*9)}%). For each meal, pick one option from each group. Amounts are approximate.`;
- SLOTS.forEach(([k,name,frac])=>{const mp=Math.round(M.p*frac),mc=Math.round(M.c*frac),mf=Math.round(M.f*frac);
-  h+=` ${name} &middot; about ${Math.round(tgt*frac/10)*10} kcal &middot; P ${mp} g &middot; C ${mc} g &middot; F ${mf} g `;
-  const groups=[['protein',mp],['carbs',mc]];if(k!=='x')groups.push(['fat',Math.round(mf*0.5)]);
-  groups.forEach(([g,need])=>{const G=BUILD[g],list=G.items.filter(okItem);if(!list.length||need<=0)return;
-   h+=` ${G.label} pick one &middot; about ${need} g ${g==='fat'?'fat':g} `+
-    list.map(it=>` ${amt(it,need)} ${esc(it.n.toLowerCase())}${kos&&it.t?` ${it.t}`:''} `).join('')+''});
-  if(k!=='x'){const v=VEG.filter(x=>okItem({n:x,f:x.toLowerCase()}));
-   h+=` Vegetables half your plate, as much as you like ${v.map(esc).join(', ')} `}
-  h+=''});
- if(kos)h+=' Keep each meal either meat or dairy. Pareve options go with both.';
- return h}
-const _dietB=renderDiet;
-renderDiet=function(){_dietB();if(!S.profile)return;
- const h3=[...document.querySelectorAll('#plan h3')].find(x=>x.textContent==="Today's menu");
- if(h3)h3.parentNode.innerHTML=builderHTML()};
-if(!$('plan').classList.contains('hide'))renderDiet();
-
-/* ---------- Meal builder v2: targets, meals a day, tap to pick ---------- */
-(function(){const st=document.createElement('style');st.textContent=
-'.mtiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}'+
-'.mtile{border-radius:12px;padding:10px 4px;text-align:center;background:rgba(255,255,255,.06)}'+
-'.mtile b{display:block;font-size:22px}.mtile small{opacity:.75;font-size:12px}'+
-'.mp b{color:#f87171}.mc b{color:#fbbf24}.mf b{color:#60a5fa}'+
-'.mcard{background:rgba(255,255,255,.04);border-radius:12px;padding:12px;margin-top:12px}'+
-'.mealhd{display:flex;justify-content:space-between;align-items:baseline}.mealhd h4{margin:0}'+
-'.mm{display:flex;gap:6px;margin:6px 0 4px}.mm span{font-size:12px;padding:2px 8px;border-radius:8px;background:rgba(255,255,255,.08)}'+
-'.grp{margin-top:10px;font-size:13px;opacity:.8}'+
-'.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}'+
-'.chip{padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.08);font-size:13px;cursor:pointer;border:1px solid transparent}'+
-'.chip.on{border-color:#22c55e;background:rgba(34,197,94,.22)}'+
-'.chip i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:6px}'+
-'.chip i.meat{background:#ef4444}.chip i.dairy{background:#3b82f6}.chip i.pareve{background:#22c55e}';
-document.head.appendChild(st)})();
-const MEALPLANS={3:[['Breakfast',.3],['Lunch',.4],['Supper',.3]],
- 4:[['Breakfast',.25],['Lunch',.35],['Snack',.1],['Supper',.3]],
- 5:[['Breakfast',.25],['Snack',.1],['Lunch',.3],['Snack',.1],['Supper',.25]],
- 6:[['Breakfast',.2],['Snack',.1],['Lunch',.25],['Snack',.1],['Supper',.25],['Evening snack',.1]]};
-S.picks=S.picks||{};
-function setMeals(n){S.profile.mealsN=+n;save();renderDiet()}
-function pick(key,i){const d=today(),P=S.picks[d]=S.picks[d]||{};
- if(P[key]===i)delete P[key];else P[key]=i;
- Object.keys(S.picks).forEach(k=>{if(k!==d)delete S.picks[k]});save();renderDiet()}
-builderHTML=function(){const p=S.profile,tgt=targetFor(today()),M=dayMacros(tgt),n=p.mealsN||4,plan=MEALPLANS[n],
- P=S.picks[today()]||{},pc=x=>Math.round(x/tgt*100);
- let h=`<h3>Your nutrition today</h3><small>${tgt} kcal</small>
- <div class="mtiles"><div class="mtile mp"><b>${M.p} g</b><small>Protein &middot; ${pc(M.p*4)}%</small></div>
- <div class="mtile mc"><b>${M.c} g</b><small>Carbs &middot; ${pc(M.c*4)}%</small></div>
- <div class="mtile mf"><b>${M.f} g</b><small>Fat &middot; ${pc(M.f*9)}%</small></div></div>
- <label>Meals a day</label><select onchange="setMeals(this.value)">${[3,4,5,6].map(x=>`<option${x===n?' selected':''}>${x}</option>`).join('')}</select>
- <p><small>Tap one option in each group to build each meal.${p.kosher?' Dots: red meat, blue dairy, green parve. Keep each meal meat or dairy.':''}</small></p>`;
- plan.forEach(([name,frac],mi)=>{const snack=frac<=.1,mp=Math.round(M.p*frac),mc=Math.round(M.c*frac),mf=Math.round(M.f*frac);
-  h+=`<div class="mcard"><div class="mealhd"><h4>${name}</h4><small>${Math.round(tgt*frac/10)*10} kcal</small></div>
-   <div class="mm"><span>Protein ${mp} g</span><span>Carbs ${mc} g</span><span>Fat ${mf} g</span></div>`;
-  const groups=[['protein',mp],['carbs',mc]];if(!snack)groups.push(['fat',Math.round(mf*.5)]);
-  groups.forEach(([g,need])=>{const list=BUILD[g].items.filter(okItem);if(!list.length||need<=0)return;const key=mi+g;
-   h+=`<div class="grp">${BUILD[g].label}: pick one</div><div class="chips">`+
-    list.map((it,i)=>`<span class="chip${P[key]===i?' on':''}" onclick="pick('${key}',${i})">${amt(it,need)} ${esc(it.n.toLowerCase())}${p.kosher&&it.t?`<i class="${it.t}"></i>`:''}</span>`).join('')+'</div>'});
-  if(!snack)h+='<div class="grp">Vegetables: fill half the plate, as much as you like</div>';
-  h+='</div>'});
- return h};
-if(!$('plan').classList.contains('hide'))renderDiet();

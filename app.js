@@ -140,7 +140,7 @@ function mealTags(m){const p=S.profile;let tg='';
 /* ---------- Diet tab ---------- */
 function renderDiet(){if(!S.profile){$('plan').innerHTML='<div class="card">Fill in Settings first.</div>';return}
  pruneShuffles();
- const p=S.profile,t=targets(),d=today(),tgt=targetFor(d),f=S.food[d]||{k:0,p:0},prefs=p.prefs||[];
+ const p=S.profile,t=targets(),d=today(),tgt=todayTarget(),f=S.food[d]||{k:0,p:0},prefs=p.prefs||[];
  const pct=Math.min(100,f.k/tgt*100),left=r1(tgt-f.k);let h='';
  if(isWeighDay()&&!loggedToday())h+=`<div class="banner" onclick="tab('log')">It's weigh-in day. Tap here to log your weight.</div>`;
  h+=`<div class="card"><h3>Today</h3>
@@ -170,11 +170,7 @@ function renderDiet(){if(!S.profile){$('plan').innerHTML='<div class="card">Fill
   <li>Pick lean meat, skinless chicken and 0 to 5% dairy.</li>
   <li>Keep pastries, fried food and processed meats occasional.</li></ul>
   <small>General guidance only. Follow your doctor's advice and get your levels checked.</small></div>`;
- let wk=0,wkT=0,rows='';
- for(let i=6;i>=0;i--){const dd=new Date();dd.setDate(dd.getDate()-i);const s=ymd(dd),e=S.food[s],tg=targetFor(s),wa=S.water[s];
-  wkT+=tg;if(e)wk+=e.k;rows+=`<tr><td>${dd.toLocaleDateString('en-GB',{weekday:'short',day:'numeric'})}</td><td>${e?e.k:'-'}</td><td><small>${tg}</small></td><td>${wa?(wa/1000).toFixed(1)+' L':'-'}</td></tr>`}
- h+=`<div class="card"><h3>Last 7 days</h3><table><tr><td><small>Day</small></td><td><small>Eaten</small></td><td><small>Target</small></td><td><small>Water</small></td></tr>${rows}</table>
-  <p>Logged total: <b>${r1(wk)}</b> of ${wkT} kcal</p></div>`;
+ h+=weekHTML();
  h+=`<div class="card"><h3>Your targets</h3>`;
  h+=(p.shabbat&&t.extra>0)?`<p>Sunday to Thursday: <b>${t.weekday}</b><br>Friday and Saturday: <b>${t.weekend}</b></p><small>Same weekly total (an average of ${t.avg} a day).</small>`:`<p>Every day: <b>${t.avg}</b> kcal</p>`;
  h+=`<p><small>Maintenance is about ${t.tdee} kcal${S.adj?`. Adjusted ${S.adj>0?'+':''}${S.adj} kcal based on your progress`:''}.</small></p>
@@ -379,7 +375,7 @@ function pickSel(key,v){const d=today(),P=S.picks[d]=S.picks[d]||{};
  '.mcard label{display:block;margin-top:10px;font-size:13px;opacity:.85}.mcard select{width:100%;margin-top:4px}'+
  '.mcard .done{color:#22c55e}.warn{color:#fbbf24;font-size:13px;margin-top:8px}';
  document.head.appendChild(st)})();
-function builderHTML(){const p=S.profile,tgt=targetFor(today()),M=dayMacros(tgt),pc=x=>Math.round(x/tgt*100);
+function builderHTML(){const p=S.profile,tgt=todayTarget(),M=dayMacros(tgt),pc=x=>Math.round(x/tgt*100);
  const P=S.picks[today()]||{},m=+(p.meals||3),s=+(p.snacks!==undefined&&p.snacks!==''?p.snacks:1),sig=m+'m'+s+'s';
  let h=`<div class="card"><h3>Your nutrition today</h3><small>${tgt} kcal</small>
  <div class="mtiles"><div class="mtile mp"><b>${M.p} g</b><small>Protein &middot; ${pc(M.p*4)}%</small></div>
@@ -403,6 +399,42 @@ function builderHTML(){const p=S.profile,tgt=targetFor(today()),M=dayMacros(tgt)
    <div class="mm"><span>${Math.round(tgt*ml.frac/10)*10} kcal</span><span>P ${mp} g</span><span>C ${mc} g</span><span>F ${mf} g</span>${picked&&picked===shown?'<span class="done">&#10003; planned</span>':''}</div>${body}</div>`});
  if(p.kosher)h+='<p><small>Keep each meal meat or dairy. Parve goes with both.</small></p>';
  return h+'</div>'}
+
+/* ---------- Week view, smart target and editing past days ---------- */
+function weekDays(){const now=new Date(),sun=new Date(now.getFullYear(),now.getMonth(),now.getDate()-now.getDay());
+ return [...Array(7)].map((_,i)=>ymd(new Date(sun.getFullYear(),sun.getMonth(),sun.getDate()+i)))}
+function carry(){const td=today();let over=0;
+ weekDays().forEach(ds=>{if(ds<td&&S.food[ds])over+=S.food[ds].k-targetFor(ds)});
+ const left=weekDays().filter(ds=>ds>=td).length;
+ return over>0?Math.min(300,Math.round(over/left/10)*10):0}
+function todayTarget(){const floor=S.profile.sex==='m'?1500:1200;return Math.max(floor,targetFor(today())-carry())}
+function weekHTML(){const td=today();let eaten=0,budget=0,rows='';
+ weekDays().forEach(ds=>{const f=S.food[ds],tg=ds===td?todayTarget():targetFor(ds),fut=ds>td,dt=new Date(ds+'T12:00');
+  budget+=targetFor(ds);if(f)eaten+=f.k;
+  const diff=f?r1(f.k-tg):null,col=diff===null?'':diff>0?'#f97316':'#22c55e';
+  rows+=`<tr${fut?' style="opacity:.4"':` onclick="editDay('${ds}')" style="cursor:pointer"`}><td>${ds===td?'<b>Today</b>':dt.toLocaleDateString('en-GB',{weekday:'short',day:'numeric'})}</td>
+   <td>${f?r1(f.k):(fut?'':'<small>not logged</small>')}</td><td><small>${tg}</small></td>
+   <td style="color:${col}">${diff===null?'':(diff>0?'+':'')+diff}</td><td>${fut?'':'<small>&#9998;</small>'}</td></tr>`});
+ const left=r1(budget-eaten),c=carry();
+ return `<div class="card"><h3>This week</h3><small>Sunday to Saturday. Tap a day to edit it.</small>
+  <table><tr><td><small>Day</small></td><td><small>Eaten</small></td><td><small>Target</small></td><td><small>+/-</small></td><td></td></tr>${rows}</table>
+  <p>Eaten so far: <b>${r1(eaten)}</b> of ${budget} kcal for the week<br><small>${left>=0?`${left} kcal left in your weekly budget.`:`${-left} kcal over your weekly budget.`}</small></p>
+  ${c?`<p><small>You went over earlier this week, so today's target is lowered by ${c} kcal to balance it. It never drops by more than 300 a day.</small></p>`:''}</div>`}
+function editDay(ds){closeEdit();const f=S.food[ds]||{k:'',p:''};
+ const d=document.createElement('div');d.className='modal';d.id='editModal';
+ d.innerHTML=`<div class="sheet"><h3>${new Date(ds+'T12:00').toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})}</h3>
+  <small>Change the totals for this day.</small>
+  <label>Calories</label><input id="edK" type="text" inputmode="decimal" value="${f.k}">
+  <label>Protein (g)</label><input id="edP" type="text" inputmode="decimal" value="${f.p}">
+  <button onclick="saveEdit('${ds}')">Save</button>
+  ${S.food[ds]?`<button class="sec" onclick="clearEdit('${ds}')">Clear this day</button>`:''}
+  <button class="sec" onclick="closeEdit()">Cancel</button></div>`;
+ d.onclick=e=>{if(e.target===d)closeEdit()};document.body.appendChild(d)}
+function closeEdit(){const d=$('editModal');if(d)d.remove()}
+function saveEdit(ds){const k=num($('edK').value),pr=num($('edP').value);
+ if(!k&&!pr)return clearEdit(ds);if(ds===today())snapFood();
+ S.food[ds]={k:r1(k),p:r1(pr)};save();closeEdit();renderDiet()}
+function clearEdit(ds){if(ds===today())snapFood();delete S.food[ds];save();closeEdit();renderDiet()}
 
 /* ---------- Activity calendar ---------- */
 S.workouts=S.workouts||{};

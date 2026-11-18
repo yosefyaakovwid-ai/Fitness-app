@@ -44,11 +44,14 @@ function renderMyMeals(){const nm={b:'Breakfast',l:'Lunch',d:'Supper',x:'Snack'}
 function shareFile(name,text,type){const file=new File([text],name,{type});
  if(navigator.canShare&&navigator.canShare({files:[file]})){navigator.share({files:[file]}).catch(()=>{});return}
  const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=name;document.body.appendChild(a);a.click();a.remove()}
-function exportCSV(){const dates=new Set([...S.logs.map(l=>l.d),...Object.keys(S.food),...Object.keys(S.water)]);
+function exportCSV(){const dates=new Set([...S.logs.map(l=>l.d),...Object.keys(S.food),...Object.keys(S.water),...Object.keys(S.workouts||{})]);
  if(!dates.size)return alert('Nothing logged yet.');
- const rows=[['date','weight_kg','calories','protein_g','target_kcal','water_ml']];
+ const rows=[['date','weight_kg','calories','protein_g','target_kcal','water_ml','activities','workout','active_min']];
  [...dates].sort().forEach(d=>{const w=S.logs.find(l=>l.d===d),f=S.food[d];
-  rows.push([d,w?w.w:'',f?f.k:'',f?f.p:'',S.profile?targetFor(d):'',S.water[d]||''])});
+  const a=(S.workouts||{})[d];
+  rows.push([d,w?w.w:'',f?f.k:'',f?f.p:'',S.profile?targetFor(d):'',S.water[d]||'',
+   a?Object.entries(a.acts).map(([id,mn])=>actById(id).n.replace(/[,;]/g,' ')+' '+mn+'min').join('; '):'',a&&a.w?a.w:'',
+   a?Object.values(a.acts).reduce((x,y)=>x+(+y||0),0):''])});
  shareFile('coach-'+today()+'.csv',rows.map(r=>r.join(',')).join('\n'),'text/csv')}
 function exportBackup(){shareFile('coach-backup-'+today()+'.json',JSON.stringify(S,null,1),'application/json')}
 function importBackup(inp){const file=inp.files[0];if(!file)return;const rd=new FileReader();
@@ -210,9 +213,10 @@ function renderTrain(){if(!S.profile){$('train').innerHTML='<div class="card">Fi
  const note={straight:'3 sets of 6 to 12 reps. Rest 1.5 to 2 minutes.',
   superset:'Exercises are paired in the order listed (A1 then A2). Do them back to back, rest 60 to 90 seconds, repeat 3 times.',
   circuit:'Do every exercise once for 10 to 12 reps with little rest, then rest 2 minutes. 3 to 4 rounds.'}[p.style];
- let h=`<div class="card"><h3>How to train</h3><small>${note} When every set feels solid, add weight or a rep. Tap Edit to change any workout.</small></div>`;
+ let h=calendarHTML()+`<div class="card"><h3>How to train</h3><small>${note} When every set feels solid, add weight or a rep. Tap Edit to change any workout.</small></div>`;
  const shown=[];for(let i=0;i<p.days;i++)shown.push(keys[i%keys.length]);
- shown.forEach((k,i)=>{const ex=exFor(k);h+=`<div class="card"><h3>Day ${i+1}: ${k}</h3>`;
+ const nx=shown.indexOf(nextW());
+ shown.forEach((k,i)=>{const ex=exFor(k);h+=`<div class="card"><h3>Day ${i+1}: ${k}${i===nx?' <span class="tag pref">next up</span>':''}</h3>`;
   if(editing===k&&shown.indexOf(k)===i){h+=`<small>One exercise per line, e.g. "Squat 4x6". Order matters for supersets.</small>
    <textarea id="ed">${ex.map(esc).join('\n')}</textarea>
    <div class="row"><button onclick="saveW('${k}')">Save</button><button class="sec" onclick="resetW('${k}')">Reset</button></div>
@@ -284,6 +288,85 @@ function showRecipe(m){closeRecipe();
  const c=el('button','Close');c.className='sec';c.style.cssText='margin-top:10px;width:100%';c.onclick=closeRecipe;
  sh.appendChild(a);sh.appendChild(c);d.appendChild(sh);
  d.onclick=e=>{if(e.target===d)closeRecipe()};document.body.appendChild(d)}
+
+/* ---------- Activity calendar ---------- */
+S.workouts=S.workouts||{};
+S.actTypes=S.actTypes||[{id:'weights',n:'Weights',e:'\u{1F3CB}\uFE0F'},{id:'basketball',n:'Basketball',e:'\u{1F3C0}'},
+ {id:'cardio',n:'Cardio',e:'\u{1F3C3}'},{id:'walk',n:'Walk',e:'\u{1F6B6}'}];
+const EMOJIS=['\u{1F4AA}','\u26BD','\u{1F3BE}','\u{1F3CA}','\u{1F6B4}','\u{1F9D8}','\u{1F94A}','\u{1F938}','\u{1F3D3}','\u{26F9}\uFE0F'];
+let calMonth=(()=>{const d=new Date();return new Date(d.getFullYear(),d.getMonth(),1)})();
+(function(){const st=document.createElement('style');st.textContent=
+ '.calhead{display:flex;align-items:center;justify-content:space-between;gap:8px}.calhead h3{margin:0}'+
+ '.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:10px}'+
+ '.cdh{text-align:center;font-size:12px;opacity:.6}'+
+ '.cday{aspect-ratio:1;border-radius:10px;background:rgba(255,255,255,.05);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:13px;cursor:pointer}'+
+ '.cday i{font-style:normal;font-size:11px;line-height:1.1;min-height:12px}'+
+ '.cday.done{background:rgba(34,197,94,.25)}.cday.today{outline:2px solid #22c55e}.cday.fut{opacity:.35;cursor:default}'+
+ '.actrow{display:flex;align-items:center;gap:10px;margin:8px 0}.actrow label{flex:1;margin:0}'+
+ '.actrow input[type=checkbox],.pill input{width:auto;margin:0 6px 0 0}'+
+ '.actrow input[type=number]{width:90px;flex:none;margin:0}'+
+ '.pills{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 12px}'+
+ '.pill{display:flex;align-items:center;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.08)}'+
+ '#dayModal .sheet>button{width:100%;margin-top:8px}'+
+ '.actlist{padding-left:0;list-style:none}.actlist li{display:flex;justify-content:space-between;align-items:center;margin:6px 0}';
+ document.head.appendChild(st)})();
+function actById(id){return S.actTypes.find(a=>a.id===id)||{id,n:id,e:'\u2022'}}
+function calMove(n){calMonth=new Date(calMonth.getFullYear(),calMonth.getMonth()+n,1);renderTrain()}
+function nextW(){const keys=Object.keys(LIB[S.profile.split]);
+ for(const d of Object.keys(S.workouts).sort().reverse()){const w=S.workouts[d];
+  if(w.w&&keys.includes(w.w))return keys[(keys.indexOf(w.w)+1)%keys.length]}
+ return keys[0]}
+function calendarHTML(){const y=calMonth.getFullYear(),m=calMonth.getMonth(),first=new Date(y,m,1).getDay(),n=new Date(y,m+1,0).getDate(),td=today();
+ let h=`<div class="card"><div class="calhead"><button class="mini" onclick="calMove(-1)">&lsaquo; Prev</button>
+  <h3>${calMonth.toLocaleDateString('en-GB',{month:'long',year:'numeric'})}</h3><button class="mini" onclick="calMove(1)">Next &rsaquo;</button></div><div class="cal">`;
+ ['S','M','T','W','T','F','S'].forEach(x=>h+=`<div class="cdh">${x}</div>`);
+ for(let i=0;i<first;i++)h+='<div></div>';
+ for(let d=1;d<=n;d++){const ds=ymd(new Date(y,m,d)),w=S.workouts[ds],fut=ds>td;
+  const em=w?Object.keys(w.acts).map(id=>actById(id).e).slice(0,3).join(''):'';
+  h+=`<div class="cday${w?' done':''}${ds===td?' today':''}${fut?' fut':''}"${fut?'':` onclick="openDay('${ds}')"`}><span>${d}</span><i>${em}</i></div>`}
+ h+='</div>';
+ const now=new Date(),sun=new Date(now);sun.setDate(now.getDate()-now.getDay());const ws=ymd(sun),mp=`${y}-${String(m+1).padStart(2,'0')}`;
+ let sess=0,mins=0,wts=0,mdays=0,mmins=0;
+ Object.entries(S.workouts).forEach(([ds,w])=>{const mn=Object.values(w.acts).reduce((a,b)=>a+(+b||0),0);
+  if(ds>=ws&&ds<=td){sess++;mins+=mn;if('weights' in w.acts)wts++}
+  if(ds.startsWith(mp)){mdays++;mmins+=mn}});
+ h+=`<p><small>This week: <b>${sess}</b> active day${sess===1?'':'s'} &middot; <b>${mins}</b> min &middot; weights <b>${wts}</b> of ${S.profile.days} planned<br>
+  ${calMonth.toLocaleDateString('en-GB',{month:'long'})}: <b>${mdays}</b> active days &middot; <b>${mmins}</b> min. Tap a day to log or edit it.</small></p>`;
+ if(!S.workouts[td])h+=`<button onclick="openDay('${td}')">Log today's activity</button>`;
+ return h+'</div>'}
+function openDay(ds,draft){closeDay();
+ const e=draft||S.workouts[ds]||{acts:{}},keys=Object.keys(LIB[S.profile.split]),wSel=e.w||nextW(),hasW='weights' in e.acts;
+ const list=S.actTypes.filter(a=>!a.hide||a.id in e.acts);
+ let h=`<h3>${new Date(ds+'T12:00').toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})}</h3>
+  <small>Tick what you did and add the minutes.</small>`;
+ list.forEach(a=>{const on=a.id in e.acts;
+  h+=`<div class="actrow"><label class="chk"><input type="checkbox" id="act-${a.id}"${on?' checked':''} onchange="actToggle('${a.id}')">${a.e} ${esc(a.n)}</label>
+   <input id="min-${a.id}" type="number" inputmode="numeric" placeholder="min" value="${on&&e.acts[a.id]?e.acts[a.id]:''}"${on?'':' disabled'}></div>`});
+ if(list.some(a=>a.id==='weights'))h+=`<div id="splitPick" style="display:${hasW?'block':'none'}"><small>Which workout?</small>
+  <div class="pills">${keys.map(k=>`<label class="pill"><input type="radio" name="wk" value="${k}"${k===wSel?' checked':''}>${k}</label>`).join('')}</div></div>`;
+ h+=`<button onclick="saveDay('${ds}')">Save</button>`;
+ if(S.workouts[ds])h+=`<button class="sec" onclick="deleteDay('${ds}')">Delete this day</button>`;
+ h+=`<button class="sec" onclick="closeDay()">Cancel</button>
+  <details style="margin-top:14px"${draft&&draft.manage?' open':''}><summary>Manage activities</summary>
+  <ul class="actlist">${S.actTypes.filter(a=>!a.hide).map(a=>`<li><span>${a.e} ${esc(a.n)}</span><button class="mini" onclick="removeAct('${a.id}','${ds}')">Remove</button></li>`).join('')}</ul>
+  <label>New activity</label><input id="newActName" placeholder="e.g. Swimming">
+  <label>Icon</label><select id="newActEmoji">${EMOJIS.map(x=>`<option>${x}</option>`).join('')}</select>
+  <button class="sec" style="width:100%;margin-top:8px" onclick="addAct('${ds}')">Add activity</button></details>`;
+ const d=document.createElement('div');d.className='modal';d.id='dayModal';d.innerHTML=`<div class="sheet">${h}</div>`;
+ d.onclick=ev=>{if(ev.target===d)closeDay()};document.body.appendChild(d)}
+function closeDay(){const d=$('dayModal');if(d)d.remove()}
+function actToggle(id){const c=$('act-'+id),i=$('min-'+id);i.disabled=!c.checked;if(c.checked)i.focus();else i.value='';
+ if(id==='weights'&&$('splitPick'))$('splitPick').style.display=c.checked?'block':'none'}
+function readDay(){const acts={};S.actTypes.forEach(a=>{const c=$('act-'+a.id);if(c&&c.checked)acts[a.id]=+$('min-'+a.id).value||0});
+ const r=document.querySelector('#dayModal input[name=wk]:checked');return{acts,w:r?r.value:''}}
+function saveDay(ds){const e=readDay();if(!Object.keys(e.acts).length)return alert('Tick at least one activity, or tap Delete this day.');
+ if(!('weights' in e.acts))delete e.w;S.workouts[ds]=e;save();closeDay();renderTrain()}
+function deleteDay(ds){if(!confirm('Remove everything logged on this day?'))return;delete S.workouts[ds];save();closeDay();renderTrain()}
+function addAct(ds){const n=$('newActName').value.trim();if(!n)return alert('Type a name for the new activity.');
+ const draft=readDay();S.actTypes.push({id:'c'+Date.now().toString(36),n,e:$('newActEmoji').value});save();draft.manage=1;openDay(ds,draft)}
+function removeAct(id,ds){if(S.actTypes.filter(a=>!a.hide).length<2)return alert('Keep at least one activity.');
+ if(!confirm(`Remove ${actById(id).n} from the list? Days you already logged will keep it.`))return;
+ const draft=readDay();delete draft.acts[id];actById(id).hide=1;save();draft.manage=1;openDay(ds,draft)}
 
 /* ---------- Start ---------- */
 renderMyMeals();

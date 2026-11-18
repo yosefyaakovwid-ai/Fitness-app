@@ -71,10 +71,18 @@ function targetFor(ds){const t=targets(),dow=new Date(ds+'T12:00').getDay(),on=S
  return on?((dow===5||dow===6)?t.weekend:t.weekday):t.avg}
 
 /* ---------- Food and water ---------- */
-function addFood(){const k=+$('kc').value,pr=+$('pr').value||0;if(!k)return;const d=today();
- const f=S.food[d]||{k:0,p:0};f.k+=k;f.p+=pr;S.food[d]=f;save();renderDiet()}
-function setFood(){const k=+$('kc').value,pr=+$('pr').value||0;if(!k&&!pr)return;S.food[today()]={k,p:pr};save();renderDiet()}
-function clearFood(){delete S.food[today()];save();renderDiet()}
+const num=v=>parseFloat(String(v).replace(',','.'))||0;
+const r1=x=>Math.round(x*10)/10;
+S.foodUndo=S.foodUndo||{};
+function snapFood(){const d=today();(S.foodUndo[d]=S.foodUndo[d]||[]).push(S.food[d]?{...S.food[d]}:null);
+ Object.keys(S.foodUndo).forEach(k=>{if(k!==d)delete S.foodUndo[k]});save()}
+function addFood(){const k=num($('kc').value),pr=num($('pr').value);if(!k)return;snapFood();const d=today();
+ const f=S.food[d]||{k:0,p:0};f.k=r1(f.k+k);f.p=r1(f.p+pr);S.food[d]=f;save();renderDiet()}
+function setFood(){const k=num($('kc').value),pr=num($('pr').value);if(!k&&!pr)return;snapFood();
+ S.food[today()]={k:r1(k),p:r1(pr)};save();renderDiet()}
+function clearFood(){if(!S.food[today()])return;snapFood();delete S.food[today()];save();renderDiet()}
+function undoFood(){const d=today(),h=S.foodUndo[d];if(!h||!h.length)return;
+ const prev=h.pop();if(prev)S.food[d]=prev;else delete S.food[d];save();renderDiet()}
 const bottleSize=()=>(S.profile&&S.profile.bottle)||750;
 function waterGoal(){const g=S.profile.waterGoal;return g>0?g:Math.round(curW()*35/100)*100}
 function addWater(ml){const d=today();S.water[d]=Math.max(0,(S.water[d]||0)+ml);save();renderDiet()}
@@ -84,13 +92,25 @@ const SLOTS=[['b','Breakfast',0.25,2],['l','Lunch',0.35,2],['d','Supper',0.30,2]
 const NONKOSHER=/pork|bacon|ham|shrimp|prawn|lobster|crab|shellfish/i;
 function prefMatch(m,k){return k==='fish'?(m.f||'').split(',').includes('fish'):(m.g||'').split(',').includes(PREFS[k][1])}
 function score(m){const p=S.profile;return(p.prefs||[]).filter(k=>prefMatch(m,k)).length+(p.chol?(m.h||0)-(m.c||0):0)+(m.mine?0.5:0)}
-function meals(){const p=S.profile,reg=p.region||'all',av=(p.avoid||'').toLowerCase().split(',').map(s=>s.trim()).filter(Boolean);
+/* Foods to avoid: exact match, plurals handled, add * for related foods (e.g. tomato*) */
+const stem=w=>{w=w.toLowerCase().trim();
+ if(w.length>4&&w.endsWith('oes'))return w.slice(0,-2);
+ if(w.length>4&&w.endsWith('ies'))return w.slice(0,-3)+'y';
+ if(/(ch|sh|x)es$/.test(w))return w.slice(0,-2);
+ if(w.length>3&&w.endsWith('s')&&!w.endsWith('ss'))return w.slice(0,-1);return w};
+const stemText=s=>' '+String(s).toLowerCase().split(/[^a-z]+/).filter(Boolean).map(stem).join(' ')+' ';
+const SYN={nut:['almond','walnut','cashew','pistachio','hazelnut','pecan'],tomato:['salsa','ketchup','passata'],
+ fish:['salmon','tuna','cod','sardine','tilapia','lox','bream','bass']};
+function avoidHit(m,terms){const t=stemText(m.n+' '+(m.f||''));
+ return terms.some(a=>{const wide=a.trim().endsWith('*'),s=stemText(a.replace(/\*/g,'')).trim();if(!s)return false;
+  return t.includes(' '+s+' ')||(wide&&(SYN[s]||[]).some(x=>t.includes(' '+x+' ')))})}
+function meals(){const p=S.profile,reg=p.region||'all',av=(p.avoid||'').split(',').map(s=>s.trim()).filter(Boolean);
  const al=(p.allergy||[]).flatMap(a=>ALLERGENS[a]?ALLERGENS[a][1]:[]);
- return MEALS.concat(S.myMeals).filter(m=>{const ing=(m.f||'').split(','),txt=(m.n+','+(m.f||'')).toLowerCase();
+ return MEALS.concat(S.myMeals).filter(m=>{const ing=(m.f||'').split(',').map(s=>s.trim()),txt=(m.n+','+(m.f||'')).toLowerCase();
   if(!m.mine&&m.r&&reg!=='all'&&!m.r.split(',').includes(reg))return false;
   if(p.kosher&&NONKOSHER.test(txt))return false;
   if(ing.some(i=>al.includes(i)))return false;
-  return !av.some(a=>txt.includes(a))})}
+  return !avoidHit(m,av)})}
 
 /* ---------- Rotation and shuffle ---------- */
 function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);
@@ -118,16 +138,17 @@ function mealTags(m){const p=S.profile;let tg='';
 function renderDiet(){if(!S.profile){$('plan').innerHTML='<div class="card">Fill in Settings first.</div>';return}
  pruneShuffles();
  const p=S.profile,t=targets(),d=today(),tgt=targetFor(d),f=S.food[d]||{k:0,p:0},prefs=p.prefs||[];
- const pct=Math.min(100,f.k/tgt*100),left=tgt-f.k;let h='';
+ const pct=Math.min(100,f.k/tgt*100),left=r1(tgt-f.k);let h='';
  if(isWeighDay()&&!loggedToday())h+=`<div class="banner" onclick="tab('log')">It's weigh-in day. Tap here to log your weight.</div>`;
  h+=`<div class="card"><h3>Today</h3>
   <div class="row"><div><small>Eaten</small><div class="big">${f.k}</div></div>
   <div><small>Target</small><div class="big" style="color:#e2e8f0">${tgt}</div></div></div>
   <div class="bar ${left<0?'over':''}"><div style="width:${pct}%"></div></div>
   <p>${left>=0?`<b>${left}</b> kcal left`:`<b>${-left}</b> kcal over`} &middot; Protein <b>${f.p}</b> / ${t.protein} g</p>
-  <div class="row"><div><label>Calories</label><input id="kc" type="number" inputmode="numeric"></div>
-  <div><label>Protein (g)</label><input id="pr" type="number" inputmode="numeric"></div></div>
+  <div class="row"><div><label>Calories</label><input id="kc" type="text" inputmode="decimal"></div>
+  <div><label>Protein (g)</label><input id="pr" type="text" inputmode="decimal"></div></div>
   <div class="row"><button onclick="addFood()">Add meal</button><button class="sec" onclick="setFood()">Set day total</button></div>
+  ${(S.foodUndo[d]||[]).length?'<button class="sec" onclick="undoFood()">Undo last entry</button>':''}
   <button class="sec" onclick="clearFood()">Clear today</button></div>`;
  const wml=S.water[d]||0,wg=waterGoal(),bt=bottleSize();
  h+=`<div class="card"><h3>Water</h3>
@@ -161,12 +182,12 @@ function renderDiet(){if(!S.profile){$('plan').innerHTML='<div class="card">Fill
  for(let i=6;i>=0;i--){const dd=new Date();dd.setDate(dd.getDate()-i);const s=ymd(dd),e=S.food[s],tg=targetFor(s),wa=S.water[s];
   wkT+=tg;if(e)wk+=e.k;rows+=`<tr><td>${dd.toLocaleDateString('en-GB',{weekday:'short',day:'numeric'})}</td><td>${e?e.k:'-'}</td><td><small>${tg}</small></td><td>${wa?(wa/1000).toFixed(1)+' L':'-'}</td></tr>`}
  h+=`<div class="card"><h3>Last 7 days</h3><table><tr><td><small>Day</small></td><td><small>Eaten</small></td><td><small>Target</small></td><td><small>Water</small></td></tr>${rows}</table>
-  <p>Logged total: <b>${wk}</b> of ${wkT} kcal</p></div>`;
+  <p>Logged total: <b>${r1(wk)}</b> of ${wkT} kcal</p></div>`;
  h+=`<div class="card"><h3>Your targets</h3>`;
  h+=(p.shabbat&&t.extra>0)?`<p>Sunday to Thursday: <b>${t.weekday}</b><br>Friday and Saturday: <b>${t.weekend}</b></p><small>Same weekly total (an average of ${t.avg} a day).</small>`:`<p>Every day: <b>${t.avg}</b> kcal</p>`;
  h+=`<p><small>Maintenance is about ${t.tdee} kcal${S.adj?`. Adjusted ${S.adj>0?'+':''}${S.adj} kcal based on your progress`:''}.</small></p>
   <p>Protein: <b>${t.protein} g</b> &middot; Water: <b>${(wg/1000).toFixed(1)} L</b> &middot; Steps: <b>8,000+</b> &middot; Sleep: <b>7 to 9 h</b></p></div>`;
- $('plan').innerHTML=h}
+ $('plan').innerHTML=h;linkMeals()}
 
 /* ---------- Training tab ---------- */
 const LIB={
@@ -232,46 +253,6 @@ function renderLog(){if(!S.profile){$('history').innerHTML='Fill in Settings fir
  if(last&&prev){const r=(prev-last)/prev*100;h+=`<p>Change from last week: <b>${(last-prev).toFixed(1)} kg</b><br><small>${r.toFixed(2)}% a week. The target is 0.25 to 1%.</small></p>`}
  h+='<ul>'+S.logs.slice(-14).reverse().map(l=>`<li>${l.d}: ${l.w} kg</li>`).join('')+'</ul>';$('history').innerHTML=h}
 
-/* ---------- Start ---------- */
-renderMyMeals();
-if(S.profile){FIELDS.forEach(f=>{if(S.profile[f])$(f).value=S.profile[f]});CHECKS.forEach(c=>$(c).checked=!!S.profile[c]);
- (S.profile.allergy||[]).forEach(a=>{const e=$('al-'+a);if(e)e.checked=true});
- (S.profile.prefs||[]).forEach(a=>{const e=$('pf-'+a);if(e)e.checked=true});tab('plan')}
-else tab('profile');
-
-/* ---------- Decimal numbers on the Diet page ---------- */
-const num=v=>parseFloat(String(v).replace(',','.'))||0;
-const r1=x=>Math.round(x*10)/10;
-function addFood(){const k=num($('kc').value),pr=num($('pr').value);if(!k)return;const d=today();
- const f=S.food[d]||{k:0,p:0};f.k=r1(f.k+k);f.p=r1(f.p+pr);S.food[d]=f;save();renderDiet()}
-function setFood(){const k=num($('kc').value),pr=num($('pr').value);if(!k&&!pr)return;
- S.food[today()]={k:r1(k),p:r1(pr)};save();renderDiet()}
-const _origDiet=renderDiet;
-renderDiet=function(){_origDiet();
- ['kc','pr'].forEach(id=>{const e=$(id);if(e){e.type='text';e.setAttribute('inputmode','decimal')}});
- document.querySelectorAll('#plan .big, #plan b').forEach(e=>{if(/^-?\d+\.\d{2,}$/.test(e.textContent))e.textContent=r1(+e.textContent)})};
-if(!$('plan').classList.contains('hide'))renderDiet();
-
-/* ---------- Foods to avoid: exact matching, plurals handled, add * for related foods ---------- */
-const stem=w=>{w=w.toLowerCase().trim();
- if(w.length>4&&w.endsWith('oes'))return w.slice(0,-2);
- if(w.length>4&&w.endsWith('ies'))return w.slice(0,-3)+'y';
- if(/(ch|sh|x)es$/.test(w))return w.slice(0,-2);
- if(w.length>3&&w.endsWith('s')&&!w.endsWith('ss'))return w.slice(0,-1);return w};
-const stemText=s=>' '+String(s).toLowerCase().split(/[^a-z]+/).filter(Boolean).map(stem).join(' ')+' ';
-const SYN={nut:['almond','walnut','cashew','pistachio','hazelnut','pecan'],tomato:['salsa','ketchup','passata'],
- fish:['salmon','tuna','cod','sardine','tilapia','lox','bream','bass']};
-function avoidHit(m,terms){const t=stemText(m.n+' '+(m.f||''));
- return terms.some(a=>{const wide=a.trim().endsWith('*'),s=stemText(a.replace(/\*/g,'')).trim();if(!s)return false;
-  return t.includes(' '+s+' ')||(wide&&(SYN[s]||[]).some(x=>t.includes(' '+x+' ')))})}
-meals=function(){const p=S.profile,reg=p.region||'all',av=(p.avoid||'').split(',').map(s=>s.trim()).filter(Boolean);
- const al=(p.allergy||[]).flatMap(a=>ALLERGENS[a]?ALLERGENS[a][1]:[]);
- return MEALS.concat(S.myMeals).filter(m=>{const ing=(m.f||'').split(',').map(s=>s.trim()),txt=(m.n+','+(m.f||'')).toLowerCase();
-  if(!m.mine&&m.r&&reg!=='all'&&!m.r.split(',').includes(reg))return false;
-  if(p.kosher&&NONKOSHER.test(txt))return false;
-  if(ing.some(i=>al.includes(i)))return false;
-  return !avoidHit(m,av)})};
-
 /* ---------- Tap a meal for its recipe ---------- */
 (function(){const st=document.createElement('style');
  st.textContent='#plan li.meal{cursor:pointer}#plan li.meal>span.nm{text-decoration:underline dotted #64748b}'+
@@ -279,42 +260,34 @@ meals=function(){const p=S.profile,reg=p.region||'all',av=(p.avoid||'').split(',
  '.sheet{background:#1e293b;width:100%;max-width:520px;max-height:85vh;overflow:auto;border-radius:16px 16px 0 0;padding:18px 16px 28px}';
  document.head.appendChild(st);
  const s=document.createElement('script');s.src='recipes.js?v='+Date.now();s.onerror=()=>{};document.head.appendChild(s)})();
-function showRecipe(m){const R=(window.RECIPES||{})[m.n];
- const q=encodeURIComponent((S.profile.kosher?'kosher ':'')+m.n.replace(/^Shabbat:\s*/,'')+' healthy recipe');
- let h=` ${esc(m.n)} `;
- if(R){if(R.serves)h+=`${esc(R.serves)}`;
-  if(R.ing)h+=' Ingredients'+R.ing.map(x=>` ${esc(x)} `).join('')+'';
-  if(R.steps)h+=' Steps'+R.steps.map(x=>` ${esc(x)} `).join('')+'';
-  if(R.tip)h+=` ${esc(R.tip)} `}
- else h+=' No built-in recipe for this one yet. Search below for ideas.';
- h+=`
-  `;
- const d=document.createElement('div');d.className='modal';d.id='recipeModal';d.innerHTML=` ${h} `;
- d.onclick=e=>{if(e.target===d)closeRecipe()};document.body.appendChild(d)}
-function closeRecipe(){const d=$('recipeModal');if(d)d.remove()}
-const _dietR=renderDiet;
-renderDiet=function(){_dietR();const all=MEALS.concat(S.myMeals);
+function linkMeals(){const all=MEALS.concat(S.myMeals);
  document.querySelectorAll('#plan li').forEach(li=>{const tn=li.firstChild;if(!tn||tn.nodeType!==3)return;
   const m=all.find(x=>x.n===tn.textContent.trim());if(!m)return;
   const sp=document.createElement('span');sp.className='nm';sp.textContent=tn.textContent;li.replaceChild(sp,tn);
-  li.classList.add('meal');li.onclick=()=>showRecipe(m)})};
-if(!$('plan').classList.contains('hide'))renderDiet();
+  li.classList.add('meal');li.onclick=()=>showRecipe(m)})}
+function closeRecipe(){const d=$('recipeModal');if(d)d.remove()}
+function showRecipe(m){closeRecipe();
+ const R=(window.RECIPES||{})[m.n];
+ const q=encodeURIComponent((S.profile.kosher?'kosher ':'')+m.n.replace(/^Shabbat:\s*/,'')+' healthy recipe');
+ const el=(tag,txt,css)=>{const e=document.createElement(tag);if(txt)e.textContent=txt;if(css)e.style.cssText=css;return e};
+ const d=el('div');d.className='modal';d.id='recipeModal';
+ const sh=el('div');sh.className='sheet';
+ sh.appendChild(el('h3',m.n,'margin:0 0 6px'));
+ if(R){if(R.serves)sh.appendChild(el('small',R.serves));
+  const list=(title,items,tag)=>{if(!items)return;sh.appendChild(el('h4',title,'margin:14px 0 6px'));
+   const l=el(tag);items.forEach(x=>l.appendChild(el('li',x)));sh.appendChild(l)};
+  list('Ingredients',R.ing,'ul');list('Steps',R.steps,'ol');
+  if(R.tip)sh.appendChild(el('p','Tip: '+R.tip,'opacity:.8;font-size:14px'))}
+ else sh.appendChild(el('p','No built-in recipe for this one yet. Search below for ideas.'));
+ const a=el('a','Search for recipes');a.href='https://www.google.com/search?q='+q;a.target='_blank';a.rel='noopener';
+ a.style.cssText='display:block;text-align:center;padding:12px;margin-top:16px;border-radius:10px;background:#22c55e;color:#06210f;font-weight:600;text-decoration:none';
+ const c=el('button','Close');c.className='sec';c.style.cssText='margin-top:10px;width:100%';c.onclick=closeRecipe;
+ sh.appendChild(a);sh.appendChild(c);d.appendChild(sh);
+ d.onclick=e=>{if(e.target===d)closeRecipe()};document.body.appendChild(d)}
 
-/* ---------- Undo last food entry ---------- */
-S.foodUndo=S.foodUndo||{};
-function snapFood(){const d=today();(S.foodUndo[d]=S.foodUndo[d]||[]).push(S.food[d]?{...S.food[d]}:null);
- Object.keys(S.foodUndo).forEach(k=>{if(k!==d)delete S.foodUndo[k]});save()}
-const _addU=addFood,_setU=setFood,_clrU=clearFood;
-addFood=function(){if(!num($('kc').value))return;snapFood();_addU()};
-setFood=function(){if(!num($('kc').value)&&!num($('pr').value))return;snapFood();_setU()};
-clearFood=function(){if(!S.food[today()])return;snapFood();_clrU()};
-function undoFood(){const d=today(),h=S.foodUndo[d];if(!h||!h.length)return;
- const prev=h.pop();if(prev)S.food[d]=prev;else delete S.food[d];save();renderDiet()}
-const _dietU=renderDiet;
-renderDiet=function(){_dietU();const h=S.foodUndo[today()];if(!h||!h.length)return;
- const c=[...document.querySelectorAll('#plan button')].find(b=>b.textContent==='Clear today');if(!c)return;
- const b=document.createElement('button');b.className='sec';b.textContent='Undo last entry';b.onclick=undoFood;
- c.parentNode.insertBefore(b,c)};
-if(!$('plan').classList.contains('hide'))
-});
-
+/* ---------- Start ---------- */
+renderMyMeals();
+if(S.profile){FIELDS.forEach(f=>{if(S.profile[f])$(f).value=S.profile[f]});CHECKS.forEach(c=>$(c).checked=!!S.profile[c]);
+ (S.profile.allergy||[]).forEach(a=>{const e=$('al-'+a);if(e)e.checked=true});
+ (S.profile.prefs||[]).forEach(a=>{const e=$('pf-'+a);if(e)e.checked=true});tab('plan')}
+else tab('profile');

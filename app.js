@@ -439,3 +439,48 @@ renderDiet=function(){_dietB();if(!S.profile)return;
  const h3=[...document.querySelectorAll('#plan h3')].find(x=>x.textContent==="Today's menu");
  if(h3)h3.parentNode.innerHTML=builderHTML()};
 if(!$('plan').classList.contains('hide'))renderDiet();
+
+/* ---------- Meal builder v2: targets, meals a day, tap to pick ---------- */
+(function(){const st=document.createElement('style');st.textContent=
+'.mtiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}'+
+'.mtile{border-radius:12px;padding:10px 4px;text-align:center;background:rgba(255,255,255,.06)}'+
+'.mtile b{display:block;font-size:22px}.mtile small{opacity:.75;font-size:12px}'+
+'.mp b{color:#f87171}.mc b{color:#fbbf24}.mf b{color:#60a5fa}'+
+'.mcard{background:rgba(255,255,255,.04);border-radius:12px;padding:12px;margin-top:12px}'+
+'.mealhd{display:flex;justify-content:space-between;align-items:baseline}.mealhd h4{margin:0}'+
+'.mm{display:flex;gap:6px;margin:6px 0 4px}.mm span{font-size:12px;padding:2px 8px;border-radius:8px;background:rgba(255,255,255,.08)}'+
+'.grp{margin-top:10px;font-size:13px;opacity:.8}'+
+'.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}'+
+'.chip{padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.08);font-size:13px;cursor:pointer;border:1px solid transparent}'+
+'.chip.on{border-color:#22c55e;background:rgba(34,197,94,.22)}'+
+'.chip i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:6px}'+
+'.chip i.meat{background:#ef4444}.chip i.dairy{background:#3b82f6}.chip i.pareve{background:#22c55e}';
+document.head.appendChild(st)})();
+const MEALPLANS={3:[['Breakfast',.3],['Lunch',.4],['Supper',.3]],
+ 4:[['Breakfast',.25],['Lunch',.35],['Snack',.1],['Supper',.3]],
+ 5:[['Breakfast',.25],['Snack',.1],['Lunch',.3],['Snack',.1],['Supper',.25]],
+ 6:[['Breakfast',.2],['Snack',.1],['Lunch',.25],['Snack',.1],['Supper',.25],['Evening snack',.1]]};
+S.picks=S.picks||{};
+function setMeals(n){S.profile.mealsN=+n;save();renderDiet()}
+function pick(key,i){const d=today(),P=S.picks[d]=S.picks[d]||{};
+ if(P[key]===i)delete P[key];else P[key]=i;
+ Object.keys(S.picks).forEach(k=>{if(k!==d)delete S.picks[k]});save();renderDiet()}
+builderHTML=function(){const p=S.profile,tgt=targetFor(today()),M=dayMacros(tgt),n=p.mealsN||4,plan=MEALPLANS[n],
+ P=S.picks[today()]||{},pc=x=>Math.round(x/tgt*100);
+ let h=`<h3>Your nutrition today</h3><small>${tgt} kcal</small>
+ <div class="mtiles"><div class="mtile mp"><b>${M.p} g</b><small>Protein &middot; ${pc(M.p*4)}%</small></div>
+ <div class="mtile mc"><b>${M.c} g</b><small>Carbs &middot; ${pc(M.c*4)}%</small></div>
+ <div class="mtile mf"><b>${M.f} g</b><small>Fat &middot; ${pc(M.f*9)}%</small></div></div>
+ <label>Meals a day</label><select onchange="setMeals(this.value)">${[3,4,5,6].map(x=>`<option${x===n?' selected':''}>${x}</option>`).join('')}</select>
+ <p><small>Tap one option in each group to build each meal.${p.kosher?' Dots: red meat, blue dairy, green parve. Keep each meal meat or dairy.':''}</small></p>`;
+ plan.forEach(([name,frac],mi)=>{const snack=frac<=.1,mp=Math.round(M.p*frac),mc=Math.round(M.c*frac),mf=Math.round(M.f*frac);
+  h+=`<div class="mcard"><div class="mealhd"><h4>${name}</h4><small>${Math.round(tgt*frac/10)*10} kcal</small></div>
+   <div class="mm"><span>Protein ${mp} g</span><span>Carbs ${mc} g</span><span>Fat ${mf} g</span></div>`;
+  const groups=[['protein',mp],['carbs',mc]];if(!snack)groups.push(['fat',Math.round(mf*.5)]);
+  groups.forEach(([g,need])=>{const list=BUILD[g].items.filter(okItem);if(!list.length||need<=0)return;const key=mi+g;
+   h+=`<div class="grp">${BUILD[g].label}: pick one</div><div class="chips">`+
+    list.map((it,i)=>`<span class="chip${P[key]===i?' on':''}" onclick="pick('${key}',${i})">${amt(it,need)} ${esc(it.n.toLowerCase())}${p.kosher&&it.t?`<i class="${it.t}"></i>`:''}</span>`).join('')+'</div>'});
+  if(!snack)h+='<div class="grp">Vegetables: fill half the plate, as much as you like</div>';
+  h+='</div>'});
+ return h};
+if(!$('plan').classList.contains('hide'))renderDiet();

@@ -299,3 +299,80 @@ renderDiet=function(){_dietR();const all=MEALS.concat(S.myMeals);
   const sp=document.createElement('span');sp.className='nm';sp.textContent=tn.textContent;li.replaceChild(sp,tn);
   li.classList.add('meal');li.onclick=()=>showRecipe(m)})};
 if(!$('plan').classList.contains('hide'))renderDiet();
+
+/* ---------- Undo last food entry ---------- */
+S.foodUndo=S.foodUndo||{};
+function snapFood(){const d=today();(S.foodUndo[d]=S.foodUndo[d]||[]).push(S.food[d]?{...S.food[d]}:null);
+ Object.keys(S.foodUndo).forEach(k=>{if(k!==d)delete S.foodUndo[k]});save()}
+const _addU=addFood,_setU=setFood,_clrU=clearFood;
+addFood=function(){if(!num($('kc').value))return;snapFood();_addU()};
+setFood=function(){if(!num($('kc').value)&&!num($('pr').value))return;snapFood();_setU()};
+clearFood=function(){if(!S.food[today()])return;snapFood();_clrU()};
+function undoFood(){const d=today(),h=S.foodUndo[d];if(!h||!h.length)return;
+ const prev=h.pop();if(prev)S.food[d]=prev;else delete S.food[d];save();renderDiet()}
+const _dietU=renderDiet;
+renderDiet=function(){_dietU();const h=S.foodUndo[today()];if(!h||!h.length)return;
+ const c=[...document.querySelectorAll('#plan button')].find(b=>b.textContent==='Clear today');if(!c)return;
+ const b=document.createElement('button');b.className='sec';b.textContent='Undo last entry';b.onclick=undoFood;
+ c.parentNode.insertBefore(b,c)};
+if(!$('plan').classList.contains('hide'))renderDiet();
+/* Coach recipes. Add new batches at the end of this file. */
+window.RECIPES=window.RECIPES||{};
+Object.assign(RECIPES,{
+'Greek yoghurt (0-2% fat), berries and oats':{serves:'1 serving · about 300 kcal · 25 g protein',
+ ing:['200 g Greek yoghurt, 0 to 2% fat','100 g berries, fresh or frozen','30 g rolled oats','1 tsp honey (optional)'],
+ steps:['Spoon the yoghurt into a bowl.','Top with oats and berries.','Drizzle with honey if you like.'],
+ tip:'Frozen berries thawed overnight make it juicier.'},
+'Porridge with ground flaxseed, cinnamon and apple':{serves:'1 serving · about 330 kcal · 9 g protein',
+ ing:['50 g rolled oats','250 ml water or unsweetened plant milk','1 tbsp ground flaxseed','1 apple, diced','Cinnamon'],
+ steps:['Simmer oats in the water or milk for 4 to 5 minutes, stirring.','Stir in the flaxseed and half the apple.','Top with the rest of the apple and cinnamon.'],
+ tip:'For more protein, have a yoghurt or two eggs on the side.'},
+'Omelette with veg and feta, wholegrain toast':{serves:'1 serving · about 380 kcal · 30 g protein',
+ ing:['2 eggs plus 2 egg whites','Half a pepper, diced','A handful of spinach','30 g light feta','1 slice wholegrain bread','Oil spray'],
+ steps:['Soften the pepper in a sprayed non-stick pan for 2 minutes, then wilt the spinach.','Beat the eggs and whites, pour over the veg and cook gently.','Crumble feta on one half, fold, and serve with toast.']},
+'Overnight oats with whey protein and banana':{serves:'1 serving · about 400 kcal · 35 g protein',
+ ing:['50 g rolled oats','30 g whey protein (1 scoop)','150 ml low-fat milk','Half a banana, sliced','Cinnamon'],
+ steps:['Mix oats, whey and milk in a jar until smooth.','Cover and refrigerate overnight.','Top with banana and cinnamon in the morning.'],
+ tip:'Add a splash more milk if it is too thick.'},
+'Egg-white scramble with spinach and mushrooms on toast':{serves:'1 serving · about 300 kcal · 30 g protein',
+ ing:['6 egg whites (about 200 ml) plus 1 whole egg','100 g mushrooms, sliced','A handful of spinach','1 tsp olive oil','1 slice wholegrain bread'],
+ steps:['Fry the mushrooms in the oil for 3 to 4 minutes, add the spinach.','Pour in the beaten eggs and stir gently until just set.','Season and serve on the toast.']},
+'Wholegrain toast with avocado and a boiled egg':{serves:'1 serving · about 400 kcal · 18 g protein',
+ ing:['2 slices wholegrain bread','Half an avocado','1 to 2 eggs','Lemon juice, salt, chilli flakes'],
+ steps:['Boil the eggs for 7 to 8 minutes, then cool and peel.','Mash the avocado with lemon and salt and spread on the toast.','Top with sliced egg and chilli flakes.']},
+'Protein pancakes (oats, egg, banana) with yoghurt':{serves:'1 serving · about 420 kcal · 28 g protein',
+ ing:['40 g rolled oats','1 egg plus 1 egg white','1 small banana','Pinch of baking powder','150 g 0% yoghurt','Oil spray'],
+ steps:['Blend oats, eggs, banana and baking powder until smooth.','Cook small pancakes in a sprayed non-stick pan, about 2 minutes a side.','Serve topped with the yoghurt.']},
+'Israeli breakfast: 2 eggs, chopped salad, labneh, wholegrain pitta':{serves:'1 serving · about 480 kcal · 25 g protein',
+ ing:['2 eggs','1 cucumber, 1 tomato and half a pepper, finely diced','Lemon juice and 1 tsp olive oil','50 g labneh','1 small wholegrain pitta'],
+ steps:['Cook the eggs your way: boiled, or fried in a sprayed pan.','Toss the diced veg with lemon, oil and salt.','Serve with labneh and the warmed pitta.']},
+'5% cottage cheese on wholegrain bread with cucumber':{serves:'1 serving · about 350 kcal · 22 g protein',
+ ing:['150 g 5% cottage cheese','2 slices wholegrain bread','Half a cucumber, sliced','Black pepper'],
+ steps:['Toast the bread if you like.','Spread with cottage cheese and top with cucumber.','Finish with black pepper.']},
+'Shakshuka with a slice of wholegrain bread':{serves:'1 serving · about 350 kcal · 17 g protein',
+ ing:['2 eggs','200 g chopped tomatoes (half a tin)','Half an onion and half a pepper, diced','1 garlic clove','Cumin and paprika','1 tsp olive oil','1 slice wholegrain bread'],
+ steps:['Soften onion, pepper and garlic in the oil for 5 minutes.','Add tomatoes and spices and simmer for 8 to 10 minutes.','Make two wells, crack in the eggs, cover and cook until set.','Serve with the bread.']},
+'Wholegrain bagel with lox and light cream cheese':{serves:'1 serving · about 380 kcal · 22 g protein',
+ ing:['1 small wholegrain or thin bagel','30 g light cream cheese','50 g lox (smoked salmon)','Cucumber, red onion and capers'],
+ steps:['Toast the bagel.','Spread with cream cheese.','Layer on the lox, cucumber, onion and capers.']},
+'Egg-white and veggie breakfast burrito':{serves:'1 serving · about 350 kcal · 28 g protein',
+ ing:['1 wholewheat tortilla','150 ml egg whites plus 1 egg','Half a pepper and a little onion, diced','20 g grated light cheese','2 tbsp salsa'],
+ steps:['Soften the veg in a sprayed pan for 3 minutes.','Add the eggs and scramble until just set.','Fill the warm tortilla with egg, cheese and salsa, then roll up.']},
+'Cottage cheese with pineapple and a sprinkle of granola':{serves:'1 serving · about 300 kcal · 25 g protein',
+ ing:['200 g low-fat cottage cheese','100 g pineapple, fresh or tinned in juice','20 g granola'],
+ steps:['Spoon the cottage cheese into a bowl.','Top with pineapple and granola.']},
+'Baked beans and poached eggs on wholemeal toast':{serves:'1 serving · about 420 kcal · 26 g protein',
+ ing:['200 g reduced-sugar baked beans (half a tin)','2 eggs','1 slice wholemeal bread','Splash of vinegar'],
+ steps:['Warm the beans in a small pan.','Poach the eggs in simmering water with the vinegar for 3 minutes.','Serve the beans and eggs on the toast.']},
+'Weetabix with skimmed milk and banana':{serves:'1 serving · about 320 kcal · 12 g protein',
+ ing:['2 Weetabix','200 ml skimmed milk','1 banana, sliced'],
+ steps:['Put the Weetabix in a bowl and pour over the milk.','Top with banana.'],
+ tip:'Low in protein, so have a yoghurt or some eggs on the side.'},
+'Quark with berries and muesli':{serves:'1 serving · about 310 kcal · 27 g protein',
+ ing:['200 g quark','100 g berries','30 g muesli','Splash of milk to loosen (optional)'],
+ steps:['Stir the quark until smooth, loosening with milk if you like.','Top with berries and muesli.']},
+'Skyr with pear and walnuts':{serves:'1 serving · about 330 kcal · 24 g protein',
+ ing:['200 g plain skyr','1 pear, sliced','15 g walnuts, roughly chopped','Cinnamon'],
+ steps:['Spoon the skyr into a bowl.','Top with pear, walnuts and a pinch of cinnamon.']}
+});
+

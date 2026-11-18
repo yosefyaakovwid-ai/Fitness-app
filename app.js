@@ -252,3 +252,50 @@ renderDiet=function(){_origDiet();
  document.querySelectorAll('#plan .big, #plan b').forEach(e=>{if(/^-?\d+\.\d{2,}$/.test(e.textContent))e.textContent=r1(+e.textContent)})};
 if(!$('plan').classList.contains('hide'))renderDiet();
 
+/* ---------- Foods to avoid: exact matching, plurals handled, add * for related foods ---------- */
+const stem=w=>{w=w.toLowerCase().trim();
+ if(w.length>4&&w.endsWith('oes'))return w.slice(0,-2);
+ if(w.length>4&&w.endsWith('ies'))return w.slice(0,-3)+'y';
+ if(/(ch|sh|x)es$/.test(w))return w.slice(0,-2);
+ if(w.length>3&&w.endsWith('s')&&!w.endsWith('ss'))return w.slice(0,-1);return w};
+const stemText=s=>' '+String(s).toLowerCase().split(/[^a-z]+/).filter(Boolean).map(stem).join(' ')+' ';
+const SYN={nut:['almond','walnut','cashew','pistachio','hazelnut','pecan'],tomato:['salsa','ketchup','passata'],
+ fish:['salmon','tuna','cod','sardine','tilapia','lox','bream','bass']};
+function avoidHit(m,terms){const t=stemText(m.n+' '+(m.f||''));
+ return terms.some(a=>{const wide=a.trim().endsWith('*'),s=stemText(a.replace(/\*/g,'')).trim();if(!s)return false;
+  return t.includes(' '+s+' ')||(wide&&(SYN[s]||[]).some(x=>t.includes(' '+x+' ')))})}
+meals=function(){const p=S.profile,reg=p.region||'all',av=(p.avoid||'').split(',').map(s=>s.trim()).filter(Boolean);
+ const al=(p.allergy||[]).flatMap(a=>ALLERGENS[a]?ALLERGENS[a][1]:[]);
+ return MEALS.concat(S.myMeals).filter(m=>{const ing=(m.f||'').split(',').map(s=>s.trim()),txt=(m.n+','+(m.f||'')).toLowerCase();
+  if(!m.mine&&m.r&&reg!=='all'&&!m.r.split(',').includes(reg))return false;
+  if(p.kosher&&NONKOSHER.test(txt))return false;
+  if(ing.some(i=>al.includes(i)))return false;
+  return !avoidHit(m,av)})};
+
+/* ---------- Tap a meal for its recipe ---------- */
+(function(){const st=document.createElement('style');
+ st.textContent='#plan li.meal{cursor:pointer}#plan li.meal>span.nm{text-decoration:underline dotted #64748b}'+
+ '.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;z-index:9}'+
+ '.sheet{background:#1e293b;width:100%;max-width:520px;max-height:85vh;overflow:auto;border-radius:16px 16px 0 0;padding:18px 16px 28px}';
+ document.head.appendChild(st);
+ const s=document.createElement('script');s.src='recipes.js?v='+Date.now();s.onerror=()=>{};document.head.appendChild(s)})();
+function showRecipe(m){const R=(window.RECIPES||{})[m.n];
+ const q=encodeURIComponent((S.profile.kosher?'kosher ':'')+m.n.replace(/^Shabbat:\s*/,'')+' healthy recipe');
+ let h=` ${esc(m.n)} `;
+ if(R){if(R.serves)h+=`${esc(R.serves)}`;
+  if(R.ing)h+=' Ingredients'+R.ing.map(x=>` ${esc(x)} `).join('')+'';
+  if(R.steps)h+=' Steps'+R.steps.map(x=>` ${esc(x)} `).join('')+'';
+  if(R.tip)h+=` ${esc(R.tip)} `}
+ else h+=' No built-in recipe for this one yet. Search below for ideas.';
+ h+=`
+  `;
+ const d=document.createElement('div');d.className='modal';d.id='recipeModal';d.innerHTML=` ${h} `;
+ d.onclick=e=>{if(e.target===d)closeRecipe()};document.body.appendChild(d)}
+function closeRecipe(){const d=$('recipeModal');if(d)d.remove()}
+const _dietR=renderDiet;
+renderDiet=function(){_dietR();const all=MEALS.concat(S.myMeals);
+ document.querySelectorAll('#plan li').forEach(li=>{const tn=li.firstChild;if(!tn||tn.nodeType!==3)return;
+  const m=all.find(x=>x.n===tn.textContent.trim());if(!m)return;
+  const sp=document.createElement('span');sp.className='nm';sp.textContent=tn.textContent;li.replaceChild(sp,tn);
+  li.classList.add('meal');li.onclick=()=>showRecipe(m)})};
+if(!$('plan').classList.contains('hide'))renderDiet();

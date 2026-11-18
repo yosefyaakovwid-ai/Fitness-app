@@ -238,3 +238,17 @@ if(S.profile){FIELDS.forEach(f=>{if(S.profile[f])$(f).value=S.profile[f]});CHECK
  (S.profile.allergy||[]).forEach(a=>{const e=$('al-'+a);if(e)e.checked=true});
  (S.profile.prefs||[]).forEach(a=>{const e=$('pf-'+a);if(e)e.checked=true});tab('plan')}
 else tab('profile');
+
+/* ---------- Decimal numbers on the Diet page ---------- */
+const num=v=>parseFloat(String(v).replace(',','.'))||0;
+const r1=x=>Math.round(x*10)/10;
+function addFood(){const k=num($('kc').value),pr=num($('pr').value);if(!k)return;const d=today();
+ const f=S.food[d]||{k:0,p:0};f.k=r1(f.k+k);f.p=r1(f.p+pr);S.food[d]=f;save();renderDiet()}
+function setFood(){const k=num($('kc').value),pr=num($('pr').value);if(!k&&!pr)return;
+ S.food[today()]={k:r1(k),p:r1(pr)};save();renderDiet()}
+const _origDiet=renderDiet;
+renderDiet=function(){_origDiet();
+ ['kc','pr'].forEach(id=>{const e=$(id);if(e){e.type='text';e.setAttribute('inputmode','decimal')}});
+ document.querySelectorAll('#plan .big, #plan b').forEach(e=>{if(/^-?\d+\.\d{2,}$/.test(e.textContent))e.textContent=r1(+e.textContent)})};
+if(!$('plan').classList.contains('hide'))renderDiet();
+

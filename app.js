@@ -374,3 +374,68 @@ if(S.profile){FIELDS.forEach(f=>{if(S.profile[f])$(f).value=S.profile[f]});CHECK
  (S.profile.allergy||[]).forEach(a=>{const e=$('al-'+a);if(e)e.checked=true});
  (S.profile.prefs||[]).forEach(a=>{const e=$('pf-'+a);if(e)e.checked=true});tab('plan')}
 else tab('profile');
+
+/* ---------- Meal builder (replaces the menu) ---------- */
+const BUILD={
+ protein:{label:'Protein',items:[
+  {n:'Chicken breast, cooked',v:31,t:'meat',f:'chicken'},
+  {n:'Turkey breast, cooked',v:29,t:'meat',f:'turkey'},
+  {n:'Lean beef, 5% fat, cooked',v:26,t:'meat',f:'beef'},
+  {n:'Salmon, cooked',v:22,t:'pareve',f:'fish,salmon'},
+  {n:'Tuna in water, drained',v:25,t:'pareve',f:'fish,tuna'},
+  {n:'White fish (cod, tilapia, denis)',v:20,t:'pareve',f:'fish,cod'},
+  {n:'Eggs',u:'egg',v:6.3,t:'pareve',f:'eggs'},
+  {n:'Greek yoghurt, 0%',v:10,t:'dairy',f:'yoghurt,milk'},
+  {n:'Cottage cheese, 5%',v:11,t:'dairy',f:'cheese,cottage cheese,milk'},
+  {n:'Firm tofu',v:14,t:'pareve',f:'tofu,soy'},
+  {n:'Whey protein',u:'scoop',v:24,t:'dairy',f:'whey,milk'}]},
+ carbs:{label:'Carbs',items:[
+  {n:'Rice, cooked',v:28,f:'rice'},
+  {n:'Wholewheat pasta, cooked',v:30,f:'wheat,pasta,gluten'},
+  {n:'Potatoes',v:17,f:'potato'},
+  {n:'Sweet potato',v:20,f:'sweet potato'},
+  {n:'Quinoa, cooked',v:21,f:'quinoa'},
+  {n:'Couscous, cooked',v:23,f:'wheat,couscous,gluten'},
+  {n:'Oats, dry',v:60,f:'oats'},
+  {n:'Wholegrain bread',u:'slice',v:15,f:'wheat,bread,gluten'},
+  {n:'Small pitta',u:'pitta',v:30,f:'wheat,bread,gluten'},
+  {n:'Banana',u:'banana',v:25,f:'banana'},
+  {n:'Berries',v:12,f:'berries'}]},
+ fat:{label:'Fats (added)',items:[
+  {n:'Olive oil',u:'tsp',v:4.5,f:'olive oil'},
+  {n:'Avocado',v:15,f:'avocado'},
+  {n:'Almonds',v:50,f:'nuts,almonds'},
+  {n:'Walnuts',v:65,f:'nuts,walnuts'},
+  {n:'Raw tahini',u:'tbsp',v:8,f:'sesame,tahini'},
+  {n:'Olives',v:11,f:'olives'}]}};
+const VEG=['Cucumber','Tomato','Peppers','Lettuce and leafy greens','Broccoli','Courgette','Carrots','Cauliflower','Mushrooms','Aubergine','Green beans','Onion'];
+const PLURAL={egg:'eggs',scoop:'scoops',slice:'slices',pitta:'pittas',banana:'bananas',tsp:'tsp',tbsp:'tbsp'};
+function dayMacros(kcal){const p=targets().protein,f=Math.round(kcal*0.27/9);
+ return{p,f,c:Math.max(0,Math.round((kcal-p*4-f*9)/4))}}
+function amt(it,g){
+ if(it.n==='Eggs'){const e=g/it.v;if(e<=4)return Math.max(1,Math.round(e))+' eggs';
+  return '2 eggs + '+Math.round((g-2*it.v)/3.6)+' egg whites'}
+ if(it.u){const n=Math.max(it.u==='tsp'?1:0.5,Math.round(g/it.v*2)/2);return n+' '+(n>1?PLURAL[it.u]:it.u)}
+ return Math.max(10,Math.round(g/it.v*10)*10)+' g'}
+function okItem(it){const p=S.profile,av=(p.avoid||'').split(',').map(s=>s.trim()).filter(Boolean);
+ const al=(p.allergy||[]).flatMap(a=>ALLERGENS[a]?ALLERGENS[a][1]:[]);
+ if((it.f||'').split(',').some(x=>al.includes(x.trim())))return false;
+ return !avoidHit({n:it.n,f:it.f||''},av)}
+function builderHTML(){const p=S.profile,tgt=targetFor(today()),M=dayMacros(tgt),kos=p.kosher,pc=x=>Math.round(x/tgt*100);
+ let h=` Build your meals Today: ${tgt} kcal &middot; protein ${M.p} g (${pc(M.p*4)}%) &middot; carbs ${M.c} g (${pc(M.c*4)}%) &middot; fat ${M.f} g (${pc(M.f*9)}%). For each meal, pick one option from each group. Amounts are approximate.`;
+ SLOTS.forEach(([k,name,frac])=>{const mp=Math.round(M.p*frac),mc=Math.round(M.c*frac),mf=Math.round(M.f*frac);
+  h+=` ${name} &middot; about ${Math.round(tgt*frac/10)*10} kcal &middot; P ${mp} g &middot; C ${mc} g &middot; F ${mf} g `;
+  const groups=[['protein',mp],['carbs',mc]];if(k!=='x')groups.push(['fat',Math.round(mf*0.5)]);
+  groups.forEach(([g,need])=>{const G=BUILD[g],list=G.items.filter(okItem);if(!list.length||need<=0)return;
+   h+=` ${G.label} pick one &middot; about ${need} g ${g==='fat'?'fat':g} `+
+    list.map(it=>` ${amt(it,need)} ${esc(it.n.toLowerCase())}${kos&&it.t?` ${it.t}`:''} `).join('')+''});
+  if(k!=='x'){const v=VEG.filter(x=>okItem({n:x,f:x.toLowerCase()}));
+   h+=` Vegetables half your plate, as much as you like ${v.map(esc).join(', ')} `}
+  h+=''});
+ if(kos)h+=' Keep each meal either meat or dairy. Pareve options go with both.';
+ return h}
+const _dietB=renderDiet;
+renderDiet=function(){_dietB();if(!S.profile)return;
+ const h3=[...document.querySelectorAll('#plan h3')].find(x=>x.textContent==="Today's menu");
+ if(h3)h3.parentNode.innerHTML=builderHTML()};
+if(!$('plan').classList.contains('hide'))renderDiet();

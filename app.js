@@ -547,3 +547,24 @@ if(S.profile){FIELDS.forEach(f=>{if(S.profile[f])$(f).value=S.profile[f]});CHECK
  (S.profile.allergy||[]).forEach(a=>{const e=$('al-'+a);if(e)e.checked=true});
  (S.profile.prefs||[]).forEach(a=>{const e=$('pf-'+a);if(e)e.checked=true});tab('plan')}
 else tab('profile');
+
+
+/* ---------- My foods: one-tap quick add ---------- */
+S.myFoods=S.myFoods||[];
+function mfKcal(f){return f.k||Math.round(f.p*4+f.c*4+f.fa*9)}
+function quickAdd(i){const f=S.myFoods[i],d=today();snapFood();const t=S.food[d]||{k:0,p:0};
+ S.food[d]={k:r1(t.k+mfKcal(f)),p:r1(t.p+f.p)};save();renderDiet()}
+function addMyFood(){const n=$('mfN').value.trim();if(!n)return alert('Type a food name first.');
+ const f={n,p:num($('mfP').value),c:num($('mfC').value),fa:num($('mfF').value),k:num($('mfK').value)};
+ if(!f.k&&!f.p&&!f.c&&!f.fa)return alert('Add calories or at least one nutrient.');
+ S.myFoods.push(f);save();renderDiet()}
+function delMyFood(i){if(!confirm('Remove '+S.myFoods[i].n+'?'))return;S.myFoods.splice(i,1);save();renderDiet()}
+function myFoodsHTML(){let h=`';
+ else h+=' No foods yet. Add your everyday foods below.';
+ h+=` `;
+ return h}
+(function(){const st=document.createElement('style');st.textContent='.mfgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}.mf{margin:0;padding:10px;text-align:left;display:flex;flex-direction:column;gap:4px;background:rgba(34,197,94,.15);color:inherit;border:1px solid rgba(34,197,94,.4)}.mf small{opacity:.8;font-weight:400}';document.head.appendChild(st)})();
+const _dietMF=renderDiet;
+renderDiet=function(){_dietMF();if(!S.profile)return;const c=$('plan').querySelector('.card');
+ if(c)c.insertAdjacentHTML('afterend',myFoodsHTML())};
+if(!$('plan').classList.contains('hide'))renderDiet();

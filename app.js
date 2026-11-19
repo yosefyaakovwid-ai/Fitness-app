@@ -221,7 +221,16 @@ function avg(a,b){const xs=S.logs.filter(l=>{const g=daysAgo(l.d);return g>=a&&g
 function adjust(){const last=avg(0,7),prev=avg(7,14);if(!last||!prev)return;
  if(S.lastAdj&&daysAgo(S.lastAdj)<7)return;
  const rate=(prev-last)/prev*100;if(rate<0.25)S.adj-=150;else if(rate>1)S.adj+=150;else return;
- S.adj=Math.max(-600,Math.min(300,S.adj));S.lastAdj=today()}
+ const before=S.adj+(rate<0.25?150:-150);S.adj=Math.max(-600,Math.min(300,S.adj));S.lastAdj=today();
+ (S.adjLog=S.adjLog||[]).push({d:today(),delta:S.adj-before})}
+function removeLog(d){const l=S.logs.find(x=>x.d===d);if(!l)return;
+ if(!confirm(`Remove the ${l.w} kg entry from ${new Date(d+'T12:00').toLocaleDateString('en-GB',{day:'numeric',month:'long'})}?`))return;
+ S.logs=S.logs.filter(x=>x.d!==d);
+ // Undo any calorie adjustment that was based on this weigh-in, then recheck with the corrected data
+ const hit=(S.adjLog||[]).filter(a=>a.d>=d&&(new Date(a.d)-new Date(d))/864e5<14);
+ if(hit.length){hit.forEach(a=>{S.adj-=a.delta});S.adjLog=S.adjLog.filter(a=>!hit.includes(a));
+  S.lastAdj=S.adjLog.length?S.adjLog[S.adjLog.length-1].d:null;adjust()}
+ save();renderLog()}
 function renderGoal(){const p=S.profile,g=p.goal;if(!g){$('goalCard').innerHTML='<div class="card"><small>Add a goal weight in Settings to track your progress towards it.</small></div>';return}
  const start=S.logs.length?S.logs[0].w:p.weight,now=avg(0,7)||curW(),prev=avg(7,14);
  const total=start-g,done=start-now,left=now-g;
@@ -240,7 +249,7 @@ function renderLog(){if(!S.profile){$('history').innerHTML='Fill in Settings fir
  const last=avg(0,7),prev=avg(7,14);let h='<h3>Progress</h3>';
  if(last)h+=`<p>This week's average: <b>${last.toFixed(1)} kg</b></p>`;
  if(last&&prev){const r=(prev-last)/prev*100;h+=`<p>Change from last week: <b>${(last-prev).toFixed(1)} kg</b><br><small>${r.toFixed(2)}% a week. The target is 0.25 to 1%.</small></p>`}
- h+='<ul>'+S.logs.slice(-14).reverse().map(l=>`<li>${l.d}: ${l.w} kg</li>`).join('')+'</ul>';$('history').innerHTML=h}
+ h+='<ul class="wlog">'+S.logs.slice(-14).reverse().map(l=>`<li><span>${new Date(l.d+'T12:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})}: <b>${l.w} kg</b></span><button class="mini" onclick="removeLog('${l.d}')">Remove</button></li>`).join('')+'</ul>';$('history').innerHTML=h}
 
 /* ---------- Tap a meal for its recipe ---------- */
 (function(){const st=document.createElement('style');
@@ -420,16 +429,24 @@ function weekHTML(){const td=today();let eaten=0,budget=0,rows='';
   <table><tr><td><small>Day</small></td><td><small>Eaten</small></td><td><small>Target</small></td><td><small>+/-</small></td><td></td></tr>${rows}</table>
   <p>Eaten so far: <b>${r1(eaten)}</b> of ${budget} kcal for the week<br><small>${left>=0?`${left} kcal left in your weekly budget.`:`${-left} kcal over your weekly budget.`}</small></p>
   ${c?`<p><small>You went over earlier this week, so today's target is lowered by ${c} kcal to balance it. It never drops by more than 300 a day.</small></p>`:''}</div>`}
-function editDay(ds){closeEdit();const f=S.food[ds]||{k:'',p:''};
+function editDay(ds){closeEdit();const f=S.food[ds];
  const d=document.createElement('div');d.className='modal';d.id='editModal';
  d.innerHTML=`<div class="sheet"><h3>${new Date(ds+'T12:00').toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})}</h3>
-  <small>Change the totals for this day.</small>
-  <label>Calories</label><input id="edK" type="text" inputmode="decimal" value="${f.k}">
-  <label>Protein (g)</label><input id="edP" type="text" inputmode="decimal" value="${f.p}">
-  <button onclick="saveEdit('${ds}')">Save</button>
-  ${S.food[ds]?`<button class="sec" onclick="clearEdit('${ds}')">Clear this day</button>`:''}
+  <p>Saved so far: <b>${f?r1(f.k):0} kcal</b> &middot; <b>${f?r1(f.p):0} g</b> protein</p>
+  <h4 style="margin:14px 0 4px">Add to this day</h4>
+  <div class="row"><div><label>Calories</label><input id="adK" type="text" inputmode="decimal" placeholder="e.g. 350"></div>
+  <div><label>Protein (g)</label><input id="adP" type="text" inputmode="decimal" placeholder="e.g. 25"></div></div>
+  <button onclick="addEdit('${ds}')">+ Add to total</button>
+  <h4 style="margin:18px 0 4px">Or change the total</h4>
+  <div class="row"><div><label>Calories</label><input id="edK" type="text" inputmode="decimal" value="${f?f.k:''}"></div>
+  <div><label>Protein (g)</label><input id="edP" type="text" inputmode="decimal" value="${f?f.p:''}"></div></div>
+  <button class="sec" onclick="saveEdit('${ds}')">Save new total</button>
+  ${f?`<button class="sec" onclick="clearEdit('${ds}')">Clear this day</button>`:''}
   <button class="sec" onclick="closeEdit()">Cancel</button></div>`;
  d.onclick=e=>{if(e.target===d)closeEdit()};document.body.appendChild(d)}
+function addEdit(ds){const k=num($('adK').value),pr=num($('adP').value);if(!k&&!pr)return;
+ if(ds===today())snapFood();const f=S.food[ds]||{k:0,p:0};
+ S.food[ds]={k:r1(f.k+k),p:r1(f.p+pr)};save();closeEdit();renderDiet()}
 function closeEdit(){const d=$('editModal');if(d)d.remove()}
 function saveEdit(ds){const k=num($('edK').value),pr=num($('edP').value);
  if(!k&&!pr)return clearEdit(ds);if(ds===today())snapFood();
@@ -514,6 +531,15 @@ function addAct(ds){const n=$('newActName').value.trim();if(!n)return alert('Typ
 function removeAct(id,ds){if(S.actTypes.filter(a=>!a.hide).length<2)return alert('Keep at least one activity.');
  if(!confirm(`Remove ${actById(id).n} from the list? Days you already logged will keep it.`))return;
  const draft=readDay();delete draft.acts[id];actById(id).hide=1;save();draft.manage=1;openDay(ds,draft)}
+
+/* ---------- Bigger navigation buttons and small styles ---------- */
+(function(){const st=document.createElement('style');st.textContent=
+ '.bignav{display:flex;gap:6px}'+
+ '.bignav>button,.bignav>a,.bignav>div{flex:1;min-height:56px;font-size:16px!important;padding:10px 4px!important;border-radius:12px;display:flex;align-items:center;justify-content:center;text-align:center}'+
+ '.wlog{list-style:none;padding-left:0}.wlog li{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)}'+
+ '#editModal .sheet>button{width:100%;margin-top:8px}';
+ document.head.appendChild(st);
+ const t=$('t-plan');if(t&&t.parentNode)t.parentNode.classList.add('bignav')})();
 
 /* ---------- Start ---------- */
 renderMyMeals();

@@ -559,11 +559,17 @@ function addMyFood(){const n=$('mfN').value.trim();if(!n)return alert('Type a fo
  if(!f.k&&!f.p&&!f.c&&!f.fa)return alert('Add calories or at least one nutrient.');
  S.myFoods.push(f);save();renderDiet()}
 function delMyFood(i){if(!confirm('Remove '+S.myFoods[i].n+'?'))return;S.myFoods.splice(i,1);save();renderDiet()}
-function myFoodsHTML(){let h=`';
- else h+=' No foods yet. Add your everyday foods below.';
- h+=` `;
+function myFoodsHTML(){let h=`<div class="card"><h3>My foods</h3><small>Tap a food to add it to today.</small>`;
+ if(S.myFoods.length)h+='<div class="mfgrid">'+S.myFoods.map((f,i)=>`<button class="qf" onclick="quickAdd(${i})"><b>+ ${esc(f.n)}</b><small>${mfKcal(f)} kcal · P ${f.p} · C ${f.c} · F ${f.fa}</small></button>`).join('')+'</div>';
+ else h+='<p><small>No foods yet. Add your everyday foods below.</small></p>';
+ h+=`<details><summary>Add or remove foods</summary>
+ <label>Food and amount</label><input id="mfN" placeholder="e.g. 2 eggs, or Greek yoghurt 200 g">
+ <div class="row"><div><label>Protein (g)</label><input id="mfP" inputmode="decimal"></div><div><label>Carbs (g)</label><input id="mfC" inputmode="decimal"></div><div><label>Fat (g)</label><input id="mfF" inputmode="decimal"></div></div>
+ <label>Calories (optional, worked out if empty)</label><input id="mfK" inputmode="decimal">
+ <button onclick="addMyFood()">Save food</button>
+ <ul class="wlog">${S.myFoods.map((f,i)=>`<li><span>${esc(f.n)}</span><button class="mini" onclick="delMyFood(${i})">Remove</button></li>`).join('')}</ul></details></div>`;
  return h}
-(function(){const st=document.createElement('style');st.textContent='.mfgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}.mf{margin:0;padding:10px;text-align:left;display:flex;flex-direction:column;gap:4px;background:rgba(34,197,94,.15);color:inherit;border:1px solid rgba(34,197,94,.4)}.mf small{opacity:.8;font-weight:400}';document.head.appendChild(st)})();
+(function(){const st=document.createElement('style');st.textContent='.mfgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}.qf{margin:0;padding:10px;text-align:left;display:flex;flex-direction:column;gap:4px;background:rgba(34,197,94,.15);color:inherit;border:1px solid rgba(34,197,94,.4)}.qf small{opacity:.8;font-weight:400}';document.head.appendChild(st)})();
 const _dietMF=renderDiet;
 renderDiet=function(){_dietMF();if(!S.profile)return;const c=$('plan').querySelector('.card');
  if(c)c.insertAdjacentHTML('afterend',myFoodsHTML())};
